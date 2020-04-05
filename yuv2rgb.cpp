@@ -4,8 +4,21 @@
 // Copyright (c) 2020 TAiGA
 // https://github.com/metarutaiga/xxYUV
 //==============================================================================
-#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+#if defined(__ARM_NEON__) || defined(__ARM_NEON) || defined(_M_ARM) || defined(_M_ARM64)
 #include <arm_neon.h>
+#elif defined(_M_IX86) || defined(_M_AMD64)
+#include <intrin.h>
+#define _MM_TRANSPOSE4_EPI8(R0, R1, R2, R3) {   \
+    __m128i T0, T1, T2, T3;                     \
+    T0 = _mm_unpacklo_epi8(R0, R1);             \
+    T1 = _mm_unpacklo_epi8(R2, R3);             \
+    T2 = _mm_unpackhi_epi8(R0, R1);             \
+    T3 = _mm_unpackhi_epi8(R2, R3);             \
+    R0 = _mm_unpacklo_epi16(T0, T1);            \
+    R1 = _mm_unpackhi_epi16(T0, T1);            \
+    R2 = _mm_unpacklo_epi16(T2, T3);            \
+    R3 = _mm_unpackhi_epi16(T2, T3);            \
+}
 #endif
 #include "yuv2rgb.h"
 
@@ -24,7 +37,7 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
         const unsigned char* v0 = (unsigned char*)v;    v = v0 + strideV;
         unsigned char* rgb0 = (unsigned char*)rgb;
         unsigned char* rgb1 = rgb0 + strideRGB;         rgb = rgb1 + strideRGB;
-#if defined(__ARM_NEON__) || defined(__ARM_NEON)
+#if defined(__ARM_NEON__) || defined(__ARM_NEON) || defined(_M_ARM) || defined(_M_ARM64)
         for (int w = 0; w < halfWidth; w += 8)
         {
             uint8x16_t y00lh = vld1q_u8(y0); y0 += 16;
@@ -34,33 +47,34 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
             int16x8_t y10 = vreinterpretq_s16_u16(vshll_n_u8(vget_low_u8(y10lh), 7));
             int16x8_t y11 = vreinterpretq_s16_u16(vshll_n_u8(vget_high_u8(y10lh), 7));
 
-            uint8x8x2_t uv00lh;
+            int16x8_t u00;
+            int16x8_t v00;
             if (interleaved)
             {
                 if (firstV)
                 {
                     uint8x16_t uv00 = vld1q_u8(v0); v0 += 16;
-                    uint8x8x2_t uv00lhx = vuzp_u8(vget_low_u8(uv00), vget_high_u8(uv00));
-                    uv00lh.val[0] = uv00lhx.val[1];
-                    uv00lh.val[1] = uv00lhx.val[0];
+                    uint8x8x2_t uv00lh = vuzp_u8(vget_low_u8(uv00), vget_high_u8(uv00));
+                    u00 = vreinterpretq_s16_u16(vsubl_u8(uv00lh.val[1], vdup_n_u8(128)));
+                    v00 = vreinterpretq_s16_u16(vsubl_u8(uv00lh.val[0], vdup_n_u8(128)));
                 }
                 else
                 {
                     uint8x16_t uv00 = vld1q_u8(u0); u0 += 16;
-                    uv00lh = vuzp_u8(vget_low_u8(uv00), vget_high_u8(uv00));
+                    uint8x8x2_t uv00lh = vuzp_u8(vget_low_u8(uv00), vget_high_u8(uv00));
+                    u00 = vreinterpretq_s16_u16(vsubl_u8(uv00lh.val[0], vdup_n_u8(128)));
+                    v00 = vreinterpretq_s16_u16(vsubl_u8(uv00lh.val[1], vdup_n_u8(128)));
                 }
             }
             else
             {
-                uv00lh.val[0] = vld1_u8(u0); u0 += 8;
-                uv00lh.val[1] = vld1_u8(v0); v0 += 8;
+                u00 = vreinterpretq_s16_u16(vsubl_u8(vld1_u8(u0), vdup_n_u8(128))); u0 += 8;
+                v00 = vreinterpretq_s16_u16(vsubl_u8(vld1_u8(v0), vdup_n_u8(128))); v0 += 8;
             }
-            int16x8_t u00 = vreinterpretq_s16_u16(vsubl_u8(uv00lh.val[0], vdup_n_u8(128)));
-            int16x8_t v00 = vreinterpretq_s16_u16(vsubl_u8(uv00lh.val[1], vdup_n_u8(128)));
 
-            int16x8_t dR =                                                        vmulq_n_s16(v00, (int16_t)( 1.28033 * 128));
-            int16x8_t dG = vaddq_s16(vmulq_n_s16(u00, (int16_t)(-0.21482 * 128)), vmulq_n_s16(v00, (int16_t)(-0.38059 * 128)));
-            int16x8_t dB =           vmulq_n_s16(u00, (int16_t)( 2.12798 * 128));
+            int16x8_t dR =                                                      vmulq_n_s16(v00, (short)( 1.28033 * 128));
+            int16x8_t dG = vaddq_s16(vmulq_n_s16(u00, (short)(-0.21482 * 128)), vmulq_n_s16(v00, (short)(-0.38059 * 128)));
+            int16x8_t dB =           vmulq_n_s16(u00, (short)( 2.12798 * 128));
 
             int16x8x2_t xR = vzipq_s16(dR, dR);
             int16x8x2_t xG = vzipq_s16(dG, dG);
@@ -80,6 +94,72 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
 
             vst4q_u8(rgb0, t);  rgb0 += 16 * 4;
             vst4q_u8(rgb1, b);  rgb1 += 16 * 4;
+        }
+        continue;
+#elif defined(_M_IX86) || defined(_M_AMD64)
+        for (int w = 0; w < halfWidth; w += 8)
+        {
+            __m128i y00lh = _mm_loadu_si128((__m128i*)y0);  y0 += 16;
+            __m128i y10lh = _mm_loadu_si128((__m128i*)y1);  y1 += 16;
+            __m128i y00 = _mm_slli_epi16(_mm_unpacklo_epi8(y00lh, __m128i()), 7);
+            __m128i y01 = _mm_slli_epi16(_mm_unpackhi_epi8(y00lh, __m128i()), 7);
+            __m128i y10 = _mm_slli_epi16(_mm_unpacklo_epi8(y10lh, __m128i()), 7);
+            __m128i y11 = _mm_slli_epi16(_mm_unpackhi_epi8(y10lh, __m128i()), 7);
+
+            __m128i u00;
+            __m128i v00;
+            if (interleaved)
+            {
+                if (firstV)
+                {
+                    __m128i uv00 = _mm_loadu_si128((__m128i*)v0);   v0 += 16;
+                    u00 = _mm_sub_epi16(_mm_srli_epi16(uv00, 8), _mm_set1_epi16(128));
+                    v00 = _mm_sub_epi16(_mm_and_si128(uv00, _mm_set1_epi16(0xFF)), _mm_set1_epi16(128));
+                }
+                else
+                {
+                    __m128i uv00 = _mm_loadu_si128((__m128i*)u0);   u0 += 16;
+                    u00 = _mm_sub_epi16(_mm_and_si128(uv00, _mm_set1_epi16(0xFF)), _mm_set1_epi16(128));
+                    v00 = _mm_sub_epi16(_mm_srli_epi16(uv00, 8), _mm_set1_epi16(128));
+                }
+            }
+            else
+            {
+                u00 = _mm_sub_epi16(_mm_unpacklo_epi8(_mm_loadl_epi64((__m128i*)u0), __m128i()), _mm_set1_epi16(128));  u0 += 8;
+                v00 = _mm_sub_epi16(_mm_unpacklo_epi8(_mm_loadl_epi64((__m128i*)v0), __m128i()), _mm_set1_epi16(128));  v0 += 8;
+            }
+
+            __m128i dR =                                                                              _mm_mullo_epi16(v00, _mm_set1_epi16((short)( 1.28033 * 128)));
+            __m128i dG = _mm_add_epi16(_mm_mullo_epi16(u00, _mm_set1_epi16((short)(-0.21482 * 128))), _mm_mullo_epi16(v00, _mm_set1_epi16((short)(-0.38059 * 128))));
+            __m128i dB =               _mm_mullo_epi16(u00, _mm_set1_epi16((short)( 2.12798 * 128)));
+
+            __m128i xR[2] = { _mm_unpacklo_epi16(dR, dR), _mm_unpackhi_epi16(dR, dR) };
+            __m128i xG[2] = { _mm_unpacklo_epi16(dG, dG), _mm_unpackhi_epi16(dG, dG) };
+            __m128i xB[2] = { _mm_unpacklo_epi16(dB, dB), _mm_unpackhi_epi16(dB, dB) };
+
+            __m128i t[4];
+            __m128i b[4];
+
+            t[0] = _mm_packus_epi16(_mm_srai_epi16(_mm_add_epi16(y00, xR[0]), 7), _mm_srai_epi16(_mm_add_epi16(y01, xR[1]), 7));
+            t[1] = _mm_packus_epi16(_mm_srai_epi16(_mm_add_epi16(y00, xG[0]), 7), _mm_srai_epi16(_mm_add_epi16(y01, xG[1]), 7));
+            t[2] = _mm_packus_epi16(_mm_srai_epi16(_mm_add_epi16(y00, xB[0]), 7), _mm_srai_epi16(_mm_add_epi16(y01, xB[1]), 7));
+            t[3] = _mm_set1_epi8(-1);
+            b[0] = _mm_packus_epi16(_mm_srai_epi16(_mm_add_epi16(y10, xR[0]), 7), _mm_srai_epi16(_mm_add_epi16(y11, xR[1]), 7));
+            b[1] = _mm_packus_epi16(_mm_srai_epi16(_mm_add_epi16(y10, xG[0]), 7), _mm_srai_epi16(_mm_add_epi16(y11, xG[1]), 7));
+            b[2] = _mm_packus_epi16(_mm_srai_epi16(_mm_add_epi16(y10, xB[0]), 7), _mm_srai_epi16(_mm_add_epi16(y11, xB[1]), 7));
+            b[3] = _mm_set1_epi8(-1);
+
+            _MM_TRANSPOSE4_EPI8(t[0], t[1], t[2], t[3]);
+            _MM_TRANSPOSE4_EPI8(b[0], b[1], b[2], b[3]);
+
+            _mm_storeu_si128((__m128i*)rgb0, t[0]); rgb0 += 16;
+            _mm_storeu_si128((__m128i*)rgb0, t[1]); rgb0 += 16;
+            _mm_storeu_si128((__m128i*)rgb0, t[2]); rgb0 += 16;
+            _mm_storeu_si128((__m128i*)rgb0, t[3]); rgb0 += 16;
+            _mm_storeu_si128((__m128i*)rgb1, b[0]); rgb1 += 16;
+            _mm_storeu_si128((__m128i*)rgb1, b[1]); rgb1 += 16;
+            _mm_storeu_si128((__m128i*)rgb1, b[2]); rgb1 += 16;
+            _mm_storeu_si128((__m128i*)rgb1, b[3]); rgb1 += 16;
         }
         continue;
 #endif
