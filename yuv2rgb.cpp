@@ -7,27 +7,23 @@
 #if defined(__ARM_NEON__) || defined(__ARM_NEON)
 #include <arm_neon.h>
 #endif
+#include "yuv2rgb.h"
 
 //------------------------------------------------------------------------------
-template<bool interleaved, bool firstV>
-void yuv2rgb_internal(unsigned char* rgb, int stride, const unsigned char* y, const unsigned char* u, const unsigned char* v, int width, int height)
+template<int rgbWidth, bool interleaved, bool firstV>
+void yuv2rgb(int width, int height, const void* y, const void* u, const void* v, int strideY, int strideU, int strideV, void* rgb, int strideRGB)
 {
     int halfWidth = width >> 1;
     int halfHeight = height >> 1;
 
     for (int h = 0; h < halfHeight; ++h)
     {
-        const unsigned char* y0 = y;
-        const unsigned char* y1 = y0 + width;    y = y1 + width;
-        const unsigned char* u0 = u;             u = u + halfWidth;
-        const unsigned char* v0 = v;             v = v + halfWidth;
-        unsigned char* rgb0 = rgb;
-        unsigned char* rgb1 = rgb0 + stride * 4; rgb = rgb1 + stride * 4;
-        if (interleaved)
-        {
-            u = u + halfWidth;
-            v = v + halfWidth;
-        }
+        const unsigned char* y0 = (unsigned char*)y;
+        const unsigned char* y1 = y0 + strideY;         y = y1 + strideY;
+        const unsigned char* u0 = (unsigned char*)u;    u = u0 + strideU;
+        const unsigned char* v0 = (unsigned char*)v;    v = v0 + strideV;
+        unsigned char* rgb0 = (unsigned char*)rgb;
+        unsigned char* rgb1 = rgb0 + strideRGB;         rgb = rgb1 + strideRGB;
 #if defined(__ARM_NEON__) || defined(__ARM_NEON)
         for (int w = 0; w < halfWidth; w += 8)
         {
@@ -89,10 +85,10 @@ void yuv2rgb_internal(unsigned char* rgb, int stride, const unsigned char* y, co
 #endif
         for (int w = 0; w < halfWidth; ++w)
         {
-            int y00 = (*y0++) * 256;
-            int y01 = (*y0++) * 256;
-            int y10 = (*y1++) * 256;
-            int y11 = (*y1++) * 256;
+            int y00 = (*y0++) * 128;
+            int y01 = (*y0++) * 128;
+            int y10 = (*y1++) * 128;
+            int y11 = (*y1++) * 128;
             int u00 = (*u0++) - 128;
             int v00 = (*v0++) - 128;
             if (interleaved)
@@ -106,50 +102,86 @@ void yuv2rgb_internal(unsigned char* rgb, int stride, const unsigned char* y, co
             // R = 1  0.00000  1.28033
             // G = 1 -0.21482 -0.38059
             // B = 1  2.12798  0.00000
-            int dR =                               v00 * (int)( 1.28033 * 256);
-            int dG = u00 * (int)(-0.21482 * 256) + v00 * (int)(-0.38059 * 256);
-            int dB = u00 * (int)( 2.12798 * 256);
+            int dR =                               v00 * (int)( 1.28033 * 128);
+            int dG = u00 * (int)(-0.21482 * 128) + v00 * (int)(-0.38059 * 128);
+            int dB = u00 * (int)( 2.12798 * 128);
 
             auto clamp = [](int value) -> unsigned char
             {
                 return (unsigned char)(value < 255 ? value < 0 ? 0 : value : 255);
             };
 
-            (*rgb0++) = clamp((y00 + dR) >> 8);
-            (*rgb0++) = clamp((y00 + dG) >> 8);
-            (*rgb0++) = clamp((y00 + dB) >> 8);
+            (*rgb0++) = clamp((y00 + dR) >> 7);
+            (*rgb0++) = clamp((y00 + dG) >> 7);
+            (*rgb0++) = clamp((y00 + dB) >> 7);
             (*rgb0++) = 255;
-            (*rgb0++) = clamp((y01 + dR) >> 8);
-            (*rgb0++) = clamp((y01 + dG) >> 8);
-            (*rgb0++) = clamp((y01 + dB) >> 8);
+            (*rgb0++) = clamp((y01 + dR) >> 7);
+            (*rgb0++) = clamp((y01 + dG) >> 7);
+            (*rgb0++) = clamp((y01 + dB) >> 7);
             (*rgb0++) = 255;
-            (*rgb1++) = clamp((y10 + dR) >> 8);
-            (*rgb1++) = clamp((y10 + dG) >> 8);
-            (*rgb1++) = clamp((y10 + dB) >> 8);
+            (*rgb1++) = clamp((y10 + dR) >> 7);
+            (*rgb1++) = clamp((y10 + dG) >> 7);
+            (*rgb1++) = clamp((y10 + dB) >> 7);
             (*rgb1++) = 255;
-            (*rgb1++) = clamp((y11 + dR) >> 8);
-            (*rgb1++) = clamp((y11 + dG) >> 8);
-            (*rgb1++) = clamp((y11 + dB) >> 8);
+            (*rgb1++) = clamp((y11 + dR) >> 7);
+            (*rgb1++) = clamp((y11 + dG) >> 7);
+            (*rgb1++) = clamp((y11 + dB) >> 7);
             (*rgb1++) = 255;
         }
     }
 }
 //------------------------------------------------------------------------------
-void yuv2rgb(unsigned char* rgb, int stride, const unsigned char* y, const unsigned char* u, const unsigned char* v, int width, int height)
+void yuv2rgb_yu12(int width, int height, const void* yuv, void* rgb, int rgbWidth, int strideRGB)
 {
-    if (u < v)
-    {
-        if (u == v + 1)
-            yuv2rgb_internal<true, false>(rgb, stride, y, u, v, width, height);
-        else
-            yuv2rgb_internal<false, false>(rgb, stride, y, u, v, width, height);
-    }
-    else
-    {
-        if (u + 1 == v)
-            yuv2rgb_internal<true, true>(rgb, stride, y, u, v, width, height);
-        else
-            yuv2rgb_internal<false, true>(rgb, stride, y, u, v, width, height);
-    }
+    int sizeY = width * height;
+    int sizeUV = width / 2 * height / 2;
+
+    if (strideRGB == 0)
+        strideRGB = rgbWidth * width;
+
+    if (rgbWidth == 3)
+        yuv2rgb<3, false, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2, rgb, rgbWidth * width);
+    else if (rgbWidth == 4)
+        yuv2rgb<4, false, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2, rgb, rgbWidth * width);
+}
+//------------------------------------------------------------------------------
+void yuv2rgb_yv12(int width, int height, const void* yuv, void* rgb, int rgbWidth, int strideRGB)
+{
+    int sizeY = width * height;
+    int sizeUV = width / 2 * height / 2;
+
+    if (strideRGB == 0)
+        strideRGB = rgbWidth * width;
+
+    if (rgbWidth == 3)
+        yuv2rgb<3, false, true>(width, height, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2, rgb, rgbWidth * width);
+    else if (rgbWidth == 4)
+        yuv2rgb<4, false, true>(width, height, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2, rgb, rgbWidth * width);
+}
+//------------------------------------------------------------------------------
+void yuv2rgb_nv12(int width, int height, const void* yuv, void* rgb, int rgbWidth, int strideRGB)
+{
+    int sizeY = width * height;
+
+    if (strideRGB == 0)
+        strideRGB = rgbWidth * width;
+
+    if (rgbWidth == 3)
+        yuv2rgb<3, true, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width, rgb, rgbWidth * width);
+    else if (rgbWidth == 4)
+        yuv2rgb<4, true, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width, rgb, rgbWidth * width);
+}
+//------------------------------------------------------------------------------
+void yuv2rgb_nv21(int width, int height, const void* yuv, void* rgb, int rgbWidth, int strideRGB)
+{
+    int sizeY = width * height;
+
+    if (strideRGB == 0)
+        strideRGB = rgbWidth * width;
+
+    if (rgbWidth == 3)
+        yuv2rgb<3, true, true>(width, height, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width, rgb, rgbWidth * width);
+    else if (rgbWidth == 4)
+        yuv2rgb<4, true, true>(width, height, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width, rgb, rgbWidth * width);
 }
 //------------------------------------------------------------------------------
