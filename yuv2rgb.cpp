@@ -22,6 +22,8 @@
 #endif
 #include "yuv2rgb.h"
 
+#define alignedValue(v, a) ((v) + (a - 1) & ~(a - 1))
+
 //------------------------------------------------------------------------------
 template<int rgbWidth, bool interleaved, bool firstV>
 void yuv2rgb(int width, int height, const void* y, const void* u, const void* v, int strideY, int strideU, int strideV, void* rgb, int strideRGB)
@@ -213,55 +215,55 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
 //------------------------------------------------------------------------------
 void yuv2rgb_yu12(int width, int height, const void* yuv, void* rgb, int rgbWidth, int strideRGB)
 {
-    int sizeY = width * height;
-    int sizeUV = width / 2 * height / 2;
+    int sizeY = alignedValue(width, 16) * alignedValue(height, 16);
+    int sizeUV = alignedValue(width / 2, 16) * alignedValue(height / 2, 16);
 
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
 
     if (rgbWidth == 3)
-        yuv2rgb<3, false, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2, rgb, rgbWidth * width);
+        yuv2rgb<3, false, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2, rgb, strideRGB);
     else if (rgbWidth == 4)
-        yuv2rgb<4, false, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2, rgb, rgbWidth * width);
+        yuv2rgb<4, false, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2, rgb, strideRGB);
 }
 //------------------------------------------------------------------------------
 void yuv2rgb_yv12(int width, int height, const void* yuv, void* rgb, int rgbWidth, int strideRGB)
 {
-    int sizeY = width * height;
-    int sizeUV = width / 2 * height / 2;
+    int sizeY = alignedValue(width, 16) * alignedValue(height, 16);
+    int sizeUV = alignedValue(width / 2, 16) * alignedValue(height / 2, 16);
 
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
 
     if (rgbWidth == 3)
-        yuv2rgb<3, false, true>(width, height, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2, rgb, rgbWidth * width);
+        yuv2rgb<3, false, true>(width, height, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2, rgb, strideRGB);
     else if (rgbWidth == 4)
-        yuv2rgb<4, false, true>(width, height, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2, rgb, rgbWidth * width);
+        yuv2rgb<4, false, true>(width, height, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2, rgb, strideRGB);
 }
 //------------------------------------------------------------------------------
 void yuv2rgb_nv12(int width, int height, const void* yuv, void* rgb, int rgbWidth, int strideRGB)
 {
-    int sizeY = width * height;
+    int sizeY = alignedValue(width, 16) * alignedValue(height, 16);
 
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
 
     if (rgbWidth == 3)
-        yuv2rgb<3, true, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width, rgb, rgbWidth * width);
+        yuv2rgb<3, true, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width, rgb, strideRGB);
     else if (rgbWidth == 4)
-        yuv2rgb<4, true, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width, rgb, rgbWidth * width);
+        yuv2rgb<4, true, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width, rgb, strideRGB);
 }
 //------------------------------------------------------------------------------
 void yuv2rgb_nv21(int width, int height, const void* yuv, void* rgb, int rgbWidth, int strideRGB)
 {
-    int sizeY = width * height;
+    int sizeY = alignedValue(width, 16) * alignedValue(height, 16);
 
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
 
     if (rgbWidth == 3)
-        yuv2rgb<3, true, true>(width, height, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width, rgb, rgbWidth * width);
+        yuv2rgb<3, true, true>(width, height, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width, rgb, strideRGB);
     else if (rgbWidth == 4)
-        yuv2rgb<4, true, true>(width, height, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width, rgb, rgbWidth * width);
+        yuv2rgb<4, true, true>(width, height, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width, rgb, strideRGB);
 }
 //------------------------------------------------------------------------------
