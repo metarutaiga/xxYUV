@@ -22,7 +22,7 @@
 #endif
 #include "yuv2rgb.h"
 
-#define alignedValue(v, a) ((v) + (a - 1) & ~(a - 1))
+#define align(v, a) ((v) + ((a) - 1) & ~((a) - 1))
 
 //------------------------------------------------------------------------------
 template<int rgbWidth, bool interleaved, bool firstV>
@@ -213,10 +213,10 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
     }
 }
 //------------------------------------------------------------------------------
-void yuv2rgb_yu12(int width, int height, const void* yuv, void* rgb, int rgbWidth, int strideRGB)
+void yuv2rgb_yu12(int width, int height, const void* yuv, void* rgb, int rgbWidth, int strideRGB, int alignWidth, int alignHeight)
 {
-    int sizeY = alignedValue(width, 16) * alignedValue(height, 16);
-    int sizeUV = alignedValue(width / 2, 16) * alignedValue(height / 2, 16);
+    int sizeY = align(width, alignWidth) * align(height, alignHeight);
+    int sizeUV = align(width / 2, alignWidth) * align(height / 2, alignHeight);
 
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
@@ -227,10 +227,10 @@ void yuv2rgb_yu12(int width, int height, const void* yuv, void* rgb, int rgbWidt
         yuv2rgb<4, false, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2, rgb, strideRGB);
 }
 //------------------------------------------------------------------------------
-void yuv2rgb_yv12(int width, int height, const void* yuv, void* rgb, int rgbWidth, int strideRGB)
+void yuv2rgb_yv12(int width, int height, const void* yuv, void* rgb, int rgbWidth, int strideRGB, int alignWidth, int alignHeight)
 {
-    int sizeY = alignedValue(width, 16) * alignedValue(height, 16);
-    int sizeUV = alignedValue(width / 2, 16) * alignedValue(height / 2, 16);
+    int sizeY = align(width, alignWidth) * align(height, alignHeight);
+    int sizeUV = align(width / 2, alignWidth) * align(height / 2, alignHeight);
 
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
@@ -241,9 +241,9 @@ void yuv2rgb_yv12(int width, int height, const void* yuv, void* rgb, int rgbWidt
         yuv2rgb<4, false, true>(width, height, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2, rgb, strideRGB);
 }
 //------------------------------------------------------------------------------
-void yuv2rgb_nv12(int width, int height, const void* yuv, void* rgb, int rgbWidth, int strideRGB)
+void yuv2rgb_nv12(int width, int height, const void* yuv, void* rgb, int rgbWidth, int strideRGB, int alignWidth, int alignHeight)
 {
-    int sizeY = alignedValue(width, 16) * alignedValue(height, 16);
+    int sizeY = align(width, alignWidth) * align(height, alignHeight);
 
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
@@ -254,9 +254,9 @@ void yuv2rgb_nv12(int width, int height, const void* yuv, void* rgb, int rgbWidt
         yuv2rgb<4, true, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width, rgb, strideRGB);
 }
 //------------------------------------------------------------------------------
-void yuv2rgb_nv21(int width, int height, const void* yuv, void* rgb, int rgbWidth, int strideRGB)
+void yuv2rgb_nv21(int width, int height, const void* yuv, void* rgb, int rgbWidth, int strideRGB, int alignWidth, int alignHeight)
 {
-    int sizeY = alignedValue(width, 16) * alignedValue(height, 16);
+    int sizeY = align(width, alignWidth) * align(height, alignHeight);
 
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
