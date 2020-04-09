@@ -6,8 +6,8 @@
 //==============================================================================
 #if defined(__ARM_NEON__) || defined(__ARM_NEON) || defined(_M_ARM) || defined(_M_ARM64)
 #include <arm_neon.h>
-#elif defined(_M_IX86) || defined(_M_AMD64)
-#include <intrin.h>
+#elif defined(_M_IX86) || defined(_M_AMD64) || defined(__i386__) || defined(__amd64__)
+#include <emmintrin.h>
 #define _MM_TRANSPOSE4_EPI8(R0, R1, R2, R3) {   \
     __m128i T0, T1, T2, T3;                     \
     T0 = _mm_unpacklo_epi8(R0, R1);             \
@@ -98,7 +98,7 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
             vst4q_u8(rgb1, b);  rgb1 += 16 * 4;
         }
         continue;
-#elif defined(_M_IX86) || defined(_M_AMD64)
+#elif defined(_M_IX86) || defined(_M_AMD64) || defined(__i386__) || defined(__amd64__)
         for (int w = 0; w < halfWidth; w += 8)
         {
             __m128i y00lh = _mm_loadu_si128((__m128i*)y0);  y0 += 16;
