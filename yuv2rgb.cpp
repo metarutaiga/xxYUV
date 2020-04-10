@@ -25,7 +25,7 @@
 #define align(v, a) ((v) + ((a) - 1) & ~((a) - 1))
 
 //------------------------------------------------------------------------------
-template<int rgbWidth, bool bgr, bool interleaved, bool firstV>
+template<int rgbWidth, bool rgbSwizzle, bool interleaved, bool firstV>
 void yuv2rgb(int width, int height, const void* y, const void* u, const void* v, int strideY, int strideU, int strideV, void* rgb, int strideRGB)
 {
     int halfWidth = width >> 1;
@@ -85,7 +85,7 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
             uint8x16x4_t t;
             uint8x16x4_t b;
 
-            if (bgr)
+            if (rgbSwizzle)
             {
                 t.val[0] = vcombine_u8(vqshrun_n_s16(vqaddq_s16(y00, xB.val[0]), 7), vqshrun_n_s16(vqaddq_s16(y01, xB.val[1]), 7));
                 t.val[1] = vcombine_u8(vqshrun_n_s16(vqaddq_s16(y00, xG.val[0]), 7), vqshrun_n_s16(vqaddq_s16(y01, xG.val[1]), 7));
@@ -156,7 +156,7 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
             __m128i t[4];
             __m128i b[4];
 
-            if (bgr)
+            if (rgbSwizzle)
             {
                 t[0] = _mm_packus_epi16(_mm_srai_epi16(_mm_add_epi16(y00, xB[0]), 7), _mm_srai_epi16(_mm_add_epi16(y01, xB[1]), 7));
                 t[1] = _mm_packus_epi16(_mm_srai_epi16(_mm_add_epi16(y00, xG[0]), 7), _mm_srai_epi16(_mm_add_epi16(y01, xG[1]), 7));
@@ -221,7 +221,7 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
                 return (unsigned char)(value < 255 ? value < 0 ? 0 : value : 255);
             };
 
-            if (bgr)
+            if (rgbSwizzle)
             {
                 (*rgb0++) = clamp((y00 + dB) >> 7);
                 (*rgb0++) = clamp((y00 + dG) >> 7);
@@ -263,7 +263,7 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
     }
 }
 //------------------------------------------------------------------------------
-void yuv2rgb_yu12(int width, int height, const void* yuv, void* rgb, int rgbWidth, bool bgr, int strideRGB, int alignWidth, int alignHeight)
+void yuv2rgb_yu12(int width, int height, const void* yuv, void* rgb, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
 {
     int sizeY = align(width, alignWidth) * align(height, alignHeight);
     int sizeUV = align(width / 2, alignWidth) * align(height / 2, alignHeight);
@@ -271,7 +271,7 @@ void yuv2rgb_yu12(int width, int height, const void* yuv, void* rgb, int rgbWidt
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
 
-    if (bgr)
+    if (rgbSwizzle)
     {
         if (rgbWidth == 3)
             yuv2rgb<3, true, false, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2, rgb, strideRGB);
@@ -287,7 +287,7 @@ void yuv2rgb_yu12(int width, int height, const void* yuv, void* rgb, int rgbWidt
     }
 }
 //------------------------------------------------------------------------------
-void yuv2rgb_yv12(int width, int height, const void* yuv, void* rgb, int rgbWidth, bool bgr, int strideRGB, int alignWidth, int alignHeight)
+void yuv2rgb_yv12(int width, int height, const void* yuv, void* rgb, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
 {
     int sizeY = align(width, alignWidth) * align(height, alignHeight);
     int sizeUV = align(width / 2, alignWidth) * align(height / 2, alignHeight);
@@ -295,7 +295,7 @@ void yuv2rgb_yv12(int width, int height, const void* yuv, void* rgb, int rgbWidt
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
 
-    if (bgr)
+    if (rgbSwizzle)
     {
         if (rgbWidth == 3)
             yuv2rgb<3, true, false, true>(width, height, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2, rgb, strideRGB);
@@ -311,14 +311,14 @@ void yuv2rgb_yv12(int width, int height, const void* yuv, void* rgb, int rgbWidt
     }
 }
 //------------------------------------------------------------------------------
-void yuv2rgb_nv12(int width, int height, const void* yuv, void* rgb, int rgbWidth, bool bgr, int strideRGB, int alignWidth, int alignHeight)
+void yuv2rgb_nv12(int width, int height, const void* yuv, void* rgb, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
 {
     int sizeY = align(width, alignWidth) * align(height, alignHeight);
 
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
 
-    if (bgr)
+    if (rgbSwizzle)
     {
         if (rgbWidth == 3)
             yuv2rgb<3, true, true, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width, rgb, strideRGB);
@@ -334,14 +334,14 @@ void yuv2rgb_nv12(int width, int height, const void* yuv, void* rgb, int rgbWidt
     }
 }
 //------------------------------------------------------------------------------
-void yuv2rgb_nv21(int width, int height, const void* yuv, void* rgb, int rgbWidth, bool bgr, int strideRGB, int alignWidth, int alignHeight)
+void yuv2rgb_nv21(int width, int height, const void* yuv, void* rgb, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
 {
     int sizeY = align(width, alignWidth) * align(height, alignHeight);
 
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
 
-    if (bgr)
+    if (rgbSwizzle)
     {
         if (rgbWidth == 3)
             yuv2rgb<3, true, true, true>(width, height, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width, rgb, strideRGB);

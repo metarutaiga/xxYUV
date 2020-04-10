@@ -9,7 +9,7 @@
 #define align(v, a) ((v) + ((a) - 1) & ~((a) - 1))
 
 //------------------------------------------------------------------------------
-template<int rgbWidth, bool interleaved, bool firstV>
+template<int rgbWidth, bool rgbSwizzle, bool interleaved, bool firstV>
 void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, void* u, void* v, int strideY, int strideU, int strideV)
 {
     int halfWidth = width >> 1;
@@ -25,22 +25,60 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
         unsigned char* v0 = (unsigned char*)v;              v = v0 + strideV;
         for (int w = 0; w < halfWidth; ++w)
         {
-            int r00 = (rgbWidth >= 1) ? (*rgb0++) : 255;
-            int g00 = (rgbWidth >= 2) ? (*rgb0++) : 255;
-            int b00 = (rgbWidth >= 3) ? (*rgb0++) : 255;
-            int a00 = (rgbWidth >= 4) ? (*rgb0++) : 255;
-            int r01 = (rgbWidth >= 1) ? (*rgb0++) : 255;
-            int g01 = (rgbWidth >= 2) ? (*rgb0++) : 255;
-            int b01 = (rgbWidth >= 3) ? (*rgb0++) : 255;
-            int a01 = (rgbWidth >= 4) ? (*rgb0++) : 255;
-            int r10 = (rgbWidth >= 1) ? (*rgb1++) : 255;
-            int g10 = (rgbWidth >= 2) ? (*rgb1++) : 255;
-            int b10 = (rgbWidth >= 3) ? (*rgb1++) : 255;
-            int a10 = (rgbWidth >= 4) ? (*rgb1++) : 255;
-            int r11 = (rgbWidth >= 1) ? (*rgb1++) : 255;
-            int g11 = (rgbWidth >= 2) ? (*rgb1++) : 255;
-            int b11 = (rgbWidth >= 3) ? (*rgb1++) : 255;
-            int a11 = (rgbWidth >= 4) ? (*rgb1++) : 255;
+            int r00;
+            int g00;
+            int b00;
+            int a00;
+            int r01;
+            int g01;
+            int b01;
+            int a01;
+            int r10;
+            int g10;
+            int b10;
+            int a10;
+            int r11;
+            int g11;
+            int b11;
+            int a11;
+            if (rgbSwizzle)
+            {
+                b00 = (rgbWidth >= 1) ? (*rgb0++) : 255;
+                g00 = (rgbWidth >= 2) ? (*rgb0++) : 255;
+                r00 = (rgbWidth >= 3) ? (*rgb0++) : 255;
+                a00 = (rgbWidth >= 4) ? (*rgb0++) : 255;
+                b01 = (rgbWidth >= 1) ? (*rgb0++) : 255;
+                g01 = (rgbWidth >= 2) ? (*rgb0++) : 255;
+                r01 = (rgbWidth >= 3) ? (*rgb0++) : 255;
+                a01 = (rgbWidth >= 4) ? (*rgb0++) : 255;
+                b10 = (rgbWidth >= 1) ? (*rgb1++) : 255;
+                g10 = (rgbWidth >= 2) ? (*rgb1++) : 255;
+                r10 = (rgbWidth >= 3) ? (*rgb1++) : 255;
+                a10 = (rgbWidth >= 4) ? (*rgb1++) : 255;
+                b11 = (rgbWidth >= 1) ? (*rgb1++) : 255;
+                g11 = (rgbWidth >= 2) ? (*rgb1++) : 255;
+                r11 = (rgbWidth >= 3) ? (*rgb1++) : 255;
+                a11 = (rgbWidth >= 4) ? (*rgb1++) : 255;
+            }
+            else
+            {
+                r00 = (rgbWidth >= 1) ? (*rgb0++) : 255;
+                g00 = (rgbWidth >= 2) ? (*rgb0++) : 255;
+                b00 = (rgbWidth >= 3) ? (*rgb0++) : 255;
+                a00 = (rgbWidth >= 4) ? (*rgb0++) : 255;
+                r01 = (rgbWidth >= 1) ? (*rgb0++) : 255;
+                g01 = (rgbWidth >= 2) ? (*rgb0++) : 255;
+                b01 = (rgbWidth >= 3) ? (*rgb0++) : 255;
+                a01 = (rgbWidth >= 4) ? (*rgb0++) : 255;
+                r10 = (rgbWidth >= 1) ? (*rgb1++) : 255;
+                g10 = (rgbWidth >= 2) ? (*rgb1++) : 255;
+                b10 = (rgbWidth >= 3) ? (*rgb1++) : 255;
+                a10 = (rgbWidth >= 4) ? (*rgb1++) : 255;
+                r11 = (rgbWidth >= 1) ? (*rgb1++) : 255;
+                g11 = (rgbWidth >= 2) ? (*rgb1++) : 255;
+                b11 = (rgbWidth >= 3) ? (*rgb1++) : 255;
+                a11 = (rgbWidth >= 4) ? (*rgb1++) : 255;
+            }
 
             int r000 = (r00 + r01 + r10 + r11) / 4;
             int g000 = (g00 + g01 + g10 + g11) / 4;
@@ -78,7 +116,7 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
     }
 }
 //------------------------------------------------------------------------------
-void rgb2yuv_yu12(int width, int height, const void* rgb, void* yuv, int rgbWidth, int strideRGB, int alignWidth, int alignHeight)
+void rgb2yuv_yu12(int width, int height, const void* rgb, void* yuv, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
 {
     int sizeY = align(width, alignWidth) * align(height, alignHeight);
     int sizeUV = align(width / 2, alignWidth) * align(height / 2, alignHeight);
@@ -86,13 +124,23 @@ void rgb2yuv_yu12(int width, int height, const void* rgb, void* yuv, int rgbWidt
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
 
-    if (rgbWidth == 3)
-        rgb2yuv<3, false, false>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2);
-    else if (rgbWidth == 4)
-        rgb2yuv<4, false, false>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2);
+    if (rgbSwizzle)
+    {
+        if (rgbWidth == 3)
+            rgb2yuv<3, true, false, false>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2);
+        else if (rgbWidth == 4)
+            rgb2yuv<4, true, false, false>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2);
+    }
+    else
+    {
+        if (rgbWidth == 3)
+            rgb2yuv<3, false, false, false>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2);
+        else if (rgbWidth == 4)
+            rgb2yuv<4, false, false, false>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2);
+    }
 }
 //------------------------------------------------------------------------------
-void rgb2yuv_yv12(int width, int height, const void* rgb, void* yuv, int rgbWidth, int strideRGB, int alignWidth, int alignHeight)
+void rgb2yuv_yv12(int width, int height, const void* rgb, void* yuv, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
 {
     int sizeY = align(width, alignWidth) * align(height, alignHeight);
     int sizeUV = align(width / 2, alignWidth) * align(height / 2, alignHeight);
@@ -100,35 +148,65 @@ void rgb2yuv_yv12(int width, int height, const void* rgb, void* yuv, int rgbWidt
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
 
-    if (rgbWidth == 3)
-        rgb2yuv<3, false, true>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2);
-    else if (rgbWidth == 4)
-        rgb2yuv<4, false, true>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2);
+    if (rgbSwizzle)
+    {
+        if (rgbWidth == 3)
+            rgb2yuv<3, true, false, true>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2);
+        else if (rgbWidth == 4)
+            rgb2yuv<4, true, false, true>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2);
+    }
+    else
+    {
+        if (rgbWidth == 3)
+            rgb2yuv<3, false, false, true>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2);
+        else if (rgbWidth == 4)
+            rgb2yuv<4, false, false, true>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2);
+    }
 }
 //------------------------------------------------------------------------------
-void rgb2yuv_nv12(int width, int height, const void* rgb, void* yuv, int rgbWidth, int strideRGB, int alignWidth, int alignHeight)
+void rgb2yuv_nv12(int width, int height, const void* rgb, void* yuv, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
 {
     int sizeY = align(width, alignWidth) * align(height, alignHeight);
 
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
 
-    if (rgbWidth == 3)
-        rgb2yuv<3, true, false>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width);
-    else if (rgbWidth == 4)
-        rgb2yuv<4, true, false>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width);
+    if (rgbSwizzle)
+    {
+        if (rgbWidth == 3)
+            rgb2yuv<3, true, true, false>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width);
+        else if (rgbWidth == 4)
+            rgb2yuv<4, true, true, false>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width);
+    }
+    else
+    {
+        if (rgbWidth == 3)
+            rgb2yuv<3, false, true, false>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width);
+        else if (rgbWidth == 4)
+            rgb2yuv<4, false, true, false>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width);
+    }
 }
 //------------------------------------------------------------------------------
-void rgb2yuv_nv21(int width, int height, const void* rgb, void* yuv, int rgbWidth, int strideRGB, int alignWidth, int alignHeight)
+void rgb2yuv_nv21(int width, int height, const void* rgb, void* yuv, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
 {
     int sizeY = align(width, alignWidth) * align(height, alignHeight);
 
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
 
-    if (rgbWidth == 3)
-        rgb2yuv<3, true, true>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width);
-    else if (rgbWidth == 4)
-        rgb2yuv<4, true, true>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width);
+    if (rgbSwizzle)
+    {
+        if (rgbWidth == 3)
+            rgb2yuv<3, true, true, true>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width);
+        else if (rgbWidth == 4)
+            rgb2yuv<4, true, true, true>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width);
+    }
+    else
+    {
+        if (rgbWidth == 3)
+            rgb2yuv<3, false, true, true>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width);
+        else if (rgbWidth == 4)
+            rgb2yuv<4, false, true, true>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width);
+    }
 }
 //------------------------------------------------------------------------------
