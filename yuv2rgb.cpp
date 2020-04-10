@@ -25,7 +25,7 @@
 #define align(v, a) ((v) + ((a) - 1) & ~((a) - 1))
 
 //------------------------------------------------------------------------------
-template<int rgbWidth, bool interleaved, bool firstV>
+template<int rgbWidth, bool bgr, bool interleaved, bool firstV>
 void yuv2rgb(int width, int height, const void* y, const void* u, const void* v, int strideY, int strideU, int strideV, void* rgb, int strideRGB)
 {
     int halfWidth = width >> 1;
@@ -85,14 +85,28 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
             uint8x16x4_t t;
             uint8x16x4_t b;
 
-            t.val[0] = vcombine_u8(vqshrun_n_s16(vqaddq_s16(y00, xR.val[0]), 7), vqshrun_n_s16(vqaddq_s16(y01, xR.val[1]), 7));
-            t.val[1] = vcombine_u8(vqshrun_n_s16(vqaddq_s16(y00, xG.val[0]), 7), vqshrun_n_s16(vqaddq_s16(y01, xG.val[1]), 7));
-            t.val[2] = vcombine_u8(vqshrun_n_s16(vqaddq_s16(y00, xB.val[0]), 7), vqshrun_n_s16(vqaddq_s16(y01, xB.val[1]), 7));
-            t.val[3] = vdupq_n_u8(255);
-            b.val[0] = vcombine_u8(vqshrun_n_s16(vqaddq_s16(y10, xR.val[0]), 7), vqshrun_n_s16(vqaddq_s16(y11, xR.val[1]), 7));
-            b.val[1] = vcombine_u8(vqshrun_n_s16(vqaddq_s16(y10, xG.val[0]), 7), vqshrun_n_s16(vqaddq_s16(y11, xG.val[1]), 7));
-            b.val[2] = vcombine_u8(vqshrun_n_s16(vqaddq_s16(y10, xB.val[0]), 7), vqshrun_n_s16(vqaddq_s16(y11, xB.val[1]), 7));
-            b.val[3] = vdupq_n_u8(255);
+            if (bgr)
+            {
+                t.val[0] = vcombine_u8(vqshrun_n_s16(vqaddq_s16(y00, xB.val[0]), 7), vqshrun_n_s16(vqaddq_s16(y01, xB.val[1]), 7));
+                t.val[1] = vcombine_u8(vqshrun_n_s16(vqaddq_s16(y00, xG.val[0]), 7), vqshrun_n_s16(vqaddq_s16(y01, xG.val[1]), 7));
+                t.val[2] = vcombine_u8(vqshrun_n_s16(vqaddq_s16(y00, xR.val[0]), 7), vqshrun_n_s16(vqaddq_s16(y01, xR.val[1]), 7));
+                t.val[3] = vdupq_n_u8(255);
+                b.val[0] = vcombine_u8(vqshrun_n_s16(vqaddq_s16(y10, xB.val[0]), 7), vqshrun_n_s16(vqaddq_s16(y11, xB.val[1]), 7));
+                b.val[1] = vcombine_u8(vqshrun_n_s16(vqaddq_s16(y10, xG.val[0]), 7), vqshrun_n_s16(vqaddq_s16(y11, xG.val[1]), 7));
+                b.val[2] = vcombine_u8(vqshrun_n_s16(vqaddq_s16(y10, xR.val[0]), 7), vqshrun_n_s16(vqaddq_s16(y11, xR.val[1]), 7));
+                b.val[3] = vdupq_n_u8(255);
+            }
+            else
+            {
+                t.val[0] = vcombine_u8(vqshrun_n_s16(vqaddq_s16(y00, xR.val[0]), 7), vqshrun_n_s16(vqaddq_s16(y01, xR.val[1]), 7));
+                t.val[1] = vcombine_u8(vqshrun_n_s16(vqaddq_s16(y00, xG.val[0]), 7), vqshrun_n_s16(vqaddq_s16(y01, xG.val[1]), 7));
+                t.val[2] = vcombine_u8(vqshrun_n_s16(vqaddq_s16(y00, xB.val[0]), 7), vqshrun_n_s16(vqaddq_s16(y01, xB.val[1]), 7));
+                t.val[3] = vdupq_n_u8(255);
+                b.val[0] = vcombine_u8(vqshrun_n_s16(vqaddq_s16(y10, xR.val[0]), 7), vqshrun_n_s16(vqaddq_s16(y11, xR.val[1]), 7));
+                b.val[1] = vcombine_u8(vqshrun_n_s16(vqaddq_s16(y10, xG.val[0]), 7), vqshrun_n_s16(vqaddq_s16(y11, xG.val[1]), 7));
+                b.val[2] = vcombine_u8(vqshrun_n_s16(vqaddq_s16(y10, xB.val[0]), 7), vqshrun_n_s16(vqaddq_s16(y11, xB.val[1]), 7));
+                b.val[3] = vdupq_n_u8(255);
+            }
 
             vst4q_u8(rgb0, t);  rgb0 += 16 * 4;
             vst4q_u8(rgb1, b);  rgb1 += 16 * 4;
@@ -142,14 +156,28 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
             __m128i t[4];
             __m128i b[4];
 
-            t[0] = _mm_packus_epi16(_mm_srai_epi16(_mm_add_epi16(y00, xR[0]), 7), _mm_srai_epi16(_mm_add_epi16(y01, xR[1]), 7));
-            t[1] = _mm_packus_epi16(_mm_srai_epi16(_mm_add_epi16(y00, xG[0]), 7), _mm_srai_epi16(_mm_add_epi16(y01, xG[1]), 7));
-            t[2] = _mm_packus_epi16(_mm_srai_epi16(_mm_add_epi16(y00, xB[0]), 7), _mm_srai_epi16(_mm_add_epi16(y01, xB[1]), 7));
-            t[3] = _mm_set1_epi8(-1);
-            b[0] = _mm_packus_epi16(_mm_srai_epi16(_mm_add_epi16(y10, xR[0]), 7), _mm_srai_epi16(_mm_add_epi16(y11, xR[1]), 7));
-            b[1] = _mm_packus_epi16(_mm_srai_epi16(_mm_add_epi16(y10, xG[0]), 7), _mm_srai_epi16(_mm_add_epi16(y11, xG[1]), 7));
-            b[2] = _mm_packus_epi16(_mm_srai_epi16(_mm_add_epi16(y10, xB[0]), 7), _mm_srai_epi16(_mm_add_epi16(y11, xB[1]), 7));
-            b[3] = _mm_set1_epi8(-1);
+            if (bgr)
+            {
+                t[0] = _mm_packus_epi16(_mm_srai_epi16(_mm_add_epi16(y00, xB[0]), 7), _mm_srai_epi16(_mm_add_epi16(y01, xB[1]), 7));
+                t[1] = _mm_packus_epi16(_mm_srai_epi16(_mm_add_epi16(y00, xG[0]), 7), _mm_srai_epi16(_mm_add_epi16(y01, xG[1]), 7));
+                t[2] = _mm_packus_epi16(_mm_srai_epi16(_mm_add_epi16(y00, xR[0]), 7), _mm_srai_epi16(_mm_add_epi16(y01, xR[1]), 7));
+                t[3] = _mm_set1_epi8(-1);
+                b[0] = _mm_packus_epi16(_mm_srai_epi16(_mm_add_epi16(y10, xB[0]), 7), _mm_srai_epi16(_mm_add_epi16(y11, xB[1]), 7));
+                b[1] = _mm_packus_epi16(_mm_srai_epi16(_mm_add_epi16(y10, xG[0]), 7), _mm_srai_epi16(_mm_add_epi16(y11, xG[1]), 7));
+                b[2] = _mm_packus_epi16(_mm_srai_epi16(_mm_add_epi16(y10, xR[0]), 7), _mm_srai_epi16(_mm_add_epi16(y11, xR[1]), 7));
+                b[3] = _mm_set1_epi8(-1);
+            }
+            else
+            {
+                t[0] = _mm_packus_epi16(_mm_srai_epi16(_mm_add_epi16(y00, xR[0]), 7), _mm_srai_epi16(_mm_add_epi16(y01, xR[1]), 7));
+                t[1] = _mm_packus_epi16(_mm_srai_epi16(_mm_add_epi16(y00, xG[0]), 7), _mm_srai_epi16(_mm_add_epi16(y01, xG[1]), 7));
+                t[2] = _mm_packus_epi16(_mm_srai_epi16(_mm_add_epi16(y00, xB[0]), 7), _mm_srai_epi16(_mm_add_epi16(y01, xB[1]), 7));
+                t[3] = _mm_set1_epi8(-1);
+                b[0] = _mm_packus_epi16(_mm_srai_epi16(_mm_add_epi16(y10, xR[0]), 7), _mm_srai_epi16(_mm_add_epi16(y11, xR[1]), 7));
+                b[1] = _mm_packus_epi16(_mm_srai_epi16(_mm_add_epi16(y10, xG[0]), 7), _mm_srai_epi16(_mm_add_epi16(y11, xG[1]), 7));
+                b[2] = _mm_packus_epi16(_mm_srai_epi16(_mm_add_epi16(y10, xB[0]), 7), _mm_srai_epi16(_mm_add_epi16(y11, xB[1]), 7));
+                b[3] = _mm_set1_epi8(-1);
+            }
 
             _MM_TRANSPOSE4_EPI8(t[0], t[1], t[2], t[3]);
             _MM_TRANSPOSE4_EPI8(b[0], b[1], b[2], b[3]);
@@ -193,27 +221,49 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
                 return (unsigned char)(value < 255 ? value < 0 ? 0 : value : 255);
             };
 
-            (*rgb0++) = clamp((y00 + dR) >> 7);
-            (*rgb0++) = clamp((y00 + dG) >> 7);
-            (*rgb0++) = clamp((y00 + dB) >> 7);
-            (*rgb0++) = 255;
-            (*rgb0++) = clamp((y01 + dR) >> 7);
-            (*rgb0++) = clamp((y01 + dG) >> 7);
-            (*rgb0++) = clamp((y01 + dB) >> 7);
-            (*rgb0++) = 255;
-            (*rgb1++) = clamp((y10 + dR) >> 7);
-            (*rgb1++) = clamp((y10 + dG) >> 7);
-            (*rgb1++) = clamp((y10 + dB) >> 7);
-            (*rgb1++) = 255;
-            (*rgb1++) = clamp((y11 + dR) >> 7);
-            (*rgb1++) = clamp((y11 + dG) >> 7);
-            (*rgb1++) = clamp((y11 + dB) >> 7);
-            (*rgb1++) = 255;
+            if (bgr)
+            {
+                (*rgb0++) = clamp((y00 + dB) >> 7);
+                (*rgb0++) = clamp((y00 + dG) >> 7);
+                (*rgb0++) = clamp((y00 + dR) >> 7);
+                (*rgb0++) = 255;
+                (*rgb0++) = clamp((y01 + dB) >> 7);
+                (*rgb0++) = clamp((y01 + dG) >> 7);
+                (*rgb0++) = clamp((y01 + dR) >> 7);
+                (*rgb0++) = 255;
+                (*rgb1++) = clamp((y10 + dB) >> 7);
+                (*rgb1++) = clamp((y10 + dG) >> 7);
+                (*rgb1++) = clamp((y10 + dR) >> 7);
+                (*rgb1++) = 255;
+                (*rgb1++) = clamp((y11 + dB) >> 7);
+                (*rgb1++) = clamp((y11 + dG) >> 7);
+                (*rgb1++) = clamp((y11 + dR) >> 7);
+                (*rgb1++) = 255;
+            }
+            else
+            {
+                (*rgb0++) = clamp((y00 + dR) >> 7);
+                (*rgb0++) = clamp((y00 + dG) >> 7);
+                (*rgb0++) = clamp((y00 + dB) >> 7);
+                (*rgb0++) = 255;
+                (*rgb0++) = clamp((y01 + dR) >> 7);
+                (*rgb0++) = clamp((y01 + dG) >> 7);
+                (*rgb0++) = clamp((y01 + dB) >> 7);
+                (*rgb0++) = 255;
+                (*rgb1++) = clamp((y10 + dR) >> 7);
+                (*rgb1++) = clamp((y10 + dG) >> 7);
+                (*rgb1++) = clamp((y10 + dB) >> 7);
+                (*rgb1++) = 255;
+                (*rgb1++) = clamp((y11 + dR) >> 7);
+                (*rgb1++) = clamp((y11 + dG) >> 7);
+                (*rgb1++) = clamp((y11 + dB) >> 7);
+                (*rgb1++) = 255;
+            }
         }
     }
 }
 //------------------------------------------------------------------------------
-void yuv2rgb_yu12(int width, int height, const void* yuv, void* rgb, int rgbWidth, int strideRGB, int alignWidth, int alignHeight)
+void yuv2rgb_yu12(int width, int height, const void* yuv, void* rgb, int rgbWidth, bool bgr, int strideRGB, int alignWidth, int alignHeight)
 {
     int sizeY = align(width, alignWidth) * align(height, alignHeight);
     int sizeUV = align(width / 2, alignWidth) * align(height / 2, alignHeight);
@@ -221,13 +271,23 @@ void yuv2rgb_yu12(int width, int height, const void* yuv, void* rgb, int rgbWidt
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
 
-    if (rgbWidth == 3)
-        yuv2rgb<3, false, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2, rgb, strideRGB);
-    else if (rgbWidth == 4)
-        yuv2rgb<4, false, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2, rgb, strideRGB);
+    if (bgr)
+    {
+        if (rgbWidth == 3)
+            yuv2rgb<3, true, false, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2, rgb, strideRGB);
+        else if (rgbWidth == 4)
+            yuv2rgb<4, true, false, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2, rgb, strideRGB);
+    }
+    else
+    {
+        if (rgbWidth == 3)
+            yuv2rgb<3, false, false, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2, rgb, strideRGB);
+        else if (rgbWidth == 4)
+            yuv2rgb<4, false, false, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2, rgb, strideRGB);
+    }
 }
 //------------------------------------------------------------------------------
-void yuv2rgb_yv12(int width, int height, const void* yuv, void* rgb, int rgbWidth, int strideRGB, int alignWidth, int alignHeight)
+void yuv2rgb_yv12(int width, int height, const void* yuv, void* rgb, int rgbWidth, bool bgr, int strideRGB, int alignWidth, int alignHeight)
 {
     int sizeY = align(width, alignWidth) * align(height, alignHeight);
     int sizeUV = align(width / 2, alignWidth) * align(height / 2, alignHeight);
@@ -235,35 +295,65 @@ void yuv2rgb_yv12(int width, int height, const void* yuv, void* rgb, int rgbWidt
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
 
-    if (rgbWidth == 3)
-        yuv2rgb<3, false, true>(width, height, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2, rgb, strideRGB);
-    else if (rgbWidth == 4)
-        yuv2rgb<4, false, true>(width, height, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2, rgb, strideRGB);
+    if (bgr)
+    {
+        if (rgbWidth == 3)
+            yuv2rgb<3, true, false, true>(width, height, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2, rgb, strideRGB);
+        else if (rgbWidth == 4)
+            yuv2rgb<4, true, false, true>(width, height, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2, rgb, strideRGB);
+    }
+    else
+    {
+        if (rgbWidth == 3)
+            yuv2rgb<3, false, false, true>(width, height, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2, rgb, strideRGB);
+        else if (rgbWidth == 4)
+            yuv2rgb<4, false, false, true>(width, height, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2, rgb, strideRGB);
+    }
 }
 //------------------------------------------------------------------------------
-void yuv2rgb_nv12(int width, int height, const void* yuv, void* rgb, int rgbWidth, int strideRGB, int alignWidth, int alignHeight)
+void yuv2rgb_nv12(int width, int height, const void* yuv, void* rgb, int rgbWidth, bool bgr, int strideRGB, int alignWidth, int alignHeight)
 {
     int sizeY = align(width, alignWidth) * align(height, alignHeight);
 
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
 
-    if (rgbWidth == 3)
-        yuv2rgb<3, true, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width, rgb, strideRGB);
-    else if (rgbWidth == 4)
-        yuv2rgb<4, true, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width, rgb, strideRGB);
+    if (bgr)
+    {
+        if (rgbWidth == 3)
+            yuv2rgb<3, true, true, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width, rgb, strideRGB);
+        else if (rgbWidth == 4)
+            yuv2rgb<4, true, true, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width, rgb, strideRGB);
+    }
+    else
+    {
+        if (rgbWidth == 3)
+            yuv2rgb<3, false, true, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width, rgb, strideRGB);
+        else if (rgbWidth == 4)
+            yuv2rgb<4, false, true, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width, rgb, strideRGB);
+    }
 }
 //------------------------------------------------------------------------------
-void yuv2rgb_nv21(int width, int height, const void* yuv, void* rgb, int rgbWidth, int strideRGB, int alignWidth, int alignHeight)
+void yuv2rgb_nv21(int width, int height, const void* yuv, void* rgb, int rgbWidth, bool bgr, int strideRGB, int alignWidth, int alignHeight)
 {
     int sizeY = align(width, alignWidth) * align(height, alignHeight);
 
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
 
-    if (rgbWidth == 3)
-        yuv2rgb<3, true, true>(width, height, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width, rgb, strideRGB);
-    else if (rgbWidth == 4)
-        yuv2rgb<4, true, true>(width, height, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width, rgb, strideRGB);
+    if (bgr)
+    {
+        if (rgbWidth == 3)
+            yuv2rgb<3, true, true, true>(width, height, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width, rgb, strideRGB);
+        else if (rgbWidth == 4)
+            yuv2rgb<4, true, true, true>(width, height, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width, rgb, strideRGB);
+    }
+    else
+    {
+        if (rgbWidth == 3)
+            yuv2rgb<3, false, true, true>(width, height, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width, rgb, strideRGB);
+        else if (rgbWidth == 4)
+            yuv2rgb<4, false, true, true>(width, height, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width, rgb, strideRGB);
+    }
 }
 //------------------------------------------------------------------------------
