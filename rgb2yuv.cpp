@@ -15,6 +15,11 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
     int halfWidth = width >> 1;
     int halfHeight = height >> 1;
 
+    int iR = rgbSwizzle ? 2 : 0;
+    int iG = 1;
+    int iB = rgbSwizzle ? 0 : 2;
+    int iA = 3;
+
     for (int h = 0; h < halfHeight; ++h)
     {
         const unsigned char* rgb0 = (unsigned char*)rgb;
@@ -25,60 +30,22 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
         unsigned char* v0 = (unsigned char*)v;              v = v0 + strideV;
         for (int w = 0; w < halfWidth; ++w)
         {
-            int r00;
-            int g00;
-            int b00;
-            int a00;
-            int r01;
-            int g01;
-            int b01;
-            int a01;
-            int r10;
-            int g10;
-            int b10;
-            int a10;
-            int r11;
-            int g11;
-            int b11;
-            int a11;
-            if (rgbSwizzle)
-            {
-                b00 = (rgbWidth >= 1) ? (*rgb0++) : 255;
-                g00 = (rgbWidth >= 2) ? (*rgb0++) : 255;
-                r00 = (rgbWidth >= 3) ? (*rgb0++) : 255;
-                a00 = (rgbWidth >= 4) ? (*rgb0++) : 255;
-                b01 = (rgbWidth >= 1) ? (*rgb0++) : 255;
-                g01 = (rgbWidth >= 2) ? (*rgb0++) : 255;
-                r01 = (rgbWidth >= 3) ? (*rgb0++) : 255;
-                a01 = (rgbWidth >= 4) ? (*rgb0++) : 255;
-                b10 = (rgbWidth >= 1) ? (*rgb1++) : 255;
-                g10 = (rgbWidth >= 2) ? (*rgb1++) : 255;
-                r10 = (rgbWidth >= 3) ? (*rgb1++) : 255;
-                a10 = (rgbWidth >= 4) ? (*rgb1++) : 255;
-                b11 = (rgbWidth >= 1) ? (*rgb1++) : 255;
-                g11 = (rgbWidth >= 2) ? (*rgb1++) : 255;
-                r11 = (rgbWidth >= 3) ? (*rgb1++) : 255;
-                a11 = (rgbWidth >= 4) ? (*rgb1++) : 255;
-            }
-            else
-            {
-                r00 = (rgbWidth >= 1) ? (*rgb0++) : 255;
-                g00 = (rgbWidth >= 2) ? (*rgb0++) : 255;
-                b00 = (rgbWidth >= 3) ? (*rgb0++) : 255;
-                a00 = (rgbWidth >= 4) ? (*rgb0++) : 255;
-                r01 = (rgbWidth >= 1) ? (*rgb0++) : 255;
-                g01 = (rgbWidth >= 2) ? (*rgb0++) : 255;
-                b01 = (rgbWidth >= 3) ? (*rgb0++) : 255;
-                a01 = (rgbWidth >= 4) ? (*rgb0++) : 255;
-                r10 = (rgbWidth >= 1) ? (*rgb1++) : 255;
-                g10 = (rgbWidth >= 2) ? (*rgb1++) : 255;
-                b10 = (rgbWidth >= 3) ? (*rgb1++) : 255;
-                a10 = (rgbWidth >= 4) ? (*rgb1++) : 255;
-                r11 = (rgbWidth >= 1) ? (*rgb1++) : 255;
-                g11 = (rgbWidth >= 2) ? (*rgb1++) : 255;
-                b11 = (rgbWidth >= 3) ? (*rgb1++) : 255;
-                a11 = (rgbWidth >= 4) ? (*rgb1++) : 255;
-            }
+            int b00 = (rgbWidth >= 1) ? rgb0[iR] : 255;
+            int g00 = (rgbWidth >= 2) ? rgb0[iG] : 255;
+            int r00 = (rgbWidth >= 3) ? rgb0[iB] : 255;
+            int a00 = (rgbWidth >= 4) ? rgb0[iA] : 255; rgb0 += rgbWidth;
+            int b01 = (rgbWidth >= 1) ? rgb0[iR] : 255;
+            int g01 = (rgbWidth >= 2) ? rgb0[iG] : 255;
+            int r01 = (rgbWidth >= 3) ? rgb0[iB] : 255;
+            int a01 = (rgbWidth >= 4) ? rgb0[iA] : 255; rgb0 += rgbWidth;
+            int b10 = (rgbWidth >= 1) ? rgb1[iR] : 255;
+            int g10 = (rgbWidth >= 2) ? rgb1[iG] : 255;
+            int r10 = (rgbWidth >= 3) ? rgb1[iB] : 255;
+            int a10 = (rgbWidth >= 4) ? rgb1[iA] : 255; rgb1 += rgbWidth;
+            int b11 = (rgbWidth >= 1) ? rgb1[iR] : 255;
+            int g11 = (rgbWidth >= 2) ? rgb1[iG] : 255;
+            int r11 = (rgbWidth >= 3) ? rgb1[iB] : 255;
+            int a11 = (rgbWidth >= 4) ? rgb1[iA] : 255; rgb1 += rgbWidth;
 
             int r000 = (r00 + r01 + r10 + r11) / 4;
             int g000 = (g00 + g01 + g10 + g11) / 4;
