@@ -5,20 +5,34 @@
 // https://github.com/metarutaiga/xxYUV
 //==============================================================================
 #if defined(__ARM_NEON__) || defined(__ARM_NEON) || defined(_M_ARM) || defined(_M_ARM64)
-#include <arm_neon.h>
+#   include <arm_neon.h>
 #elif defined(_M_IX86) || defined(_M_AMD64) || defined(__i386__) || defined(__amd64__)
-#include <emmintrin.h>
-#define _MM_TRANSPOSE4_EPI8(R0, R1, R2, R3) {   \
-    __m128i T0, T1, T2, T3;                     \
-    T0 = _mm_unpacklo_epi8(R0, R1);             \
-    T1 = _mm_unpacklo_epi8(R2, R3);             \
-    T2 = _mm_unpackhi_epi8(R0, R1);             \
-    T3 = _mm_unpackhi_epi8(R2, R3);             \
-    R0 = _mm_unpacklo_epi16(T0, T1);            \
-    R1 = _mm_unpackhi_epi16(T0, T1);            \
-    R2 = _mm_unpacklo_epi16(T2, T3);            \
-    R3 = _mm_unpackhi_epi16(T2, T3);            \
-}
+#   include <emmintrin.h>
+#   define _MM_TRANSPOSE4_EPI8(R0, R1, R2, R3) {    \
+        __m128i T0, T1, T2, T3;                     \
+        T0 = _mm_unpacklo_epi8(R0, R1);             \
+        T1 = _mm_unpacklo_epi8(R2, R3);             \
+        T2 = _mm_unpackhi_epi8(R0, R1);             \
+        T3 = _mm_unpackhi_epi8(R2, R3);             \
+        R0 = _mm_unpacklo_epi16(T0, T1);            \
+        R1 = _mm_unpackhi_epi16(T0, T1);            \
+        R2 = _mm_unpacklo_epi16(T2, T3);            \
+        R3 = _mm_unpackhi_epi16(T2, T3);            \
+    }
+#   if defined(__AVX2__) && 0
+#       include <immintrin.h>
+#       define _MM256_TRANSPOSE4_EPI8(R0, R1, R2, R3) { \
+            __m256i T0, T1, T2, T3;                     \
+            T0 = _mm256_unpacklo_epi8(R0, R1);          \
+            T1 = _mm256_unpacklo_epi8(R2, R3);          \
+            T2 = _mm256_unpackhi_epi8(R0, R1);          \
+            T3 = _mm256_unpackhi_epi8(R2, R3);          \
+            R0 = _mm256_unpacklo_epi16(T0, T1);         \
+            R1 = _mm256_unpackhi_epi16(T0, T1);         \
+            R2 = _mm256_unpacklo_epi16(T2, T3);         \
+            R3 = _mm256_unpackhi_epi16(T2, T3);         \
+        }
+#   endif
 #endif
 #include "yuv2rgb.h"
 
@@ -106,6 +120,75 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
         if (rgbWidth == 4)
             continue;
 #elif defined(_M_IX86) || defined(_M_AMD64) || defined(__i386__) || defined(__amd64__)
+#if defined(__AVX2__) && 0
+        int halfWidth16 = (rgbWidth == 4) ? halfWidth / 16 : 0;
+        for (int w = 0; w < halfWidth16; ++w)
+        {
+            __m256i y00lh = _mm256_load_si256((__m256i*)y0);   y0 += 32;
+            __m256i y10lh = _mm256_load_si256((__m256i*)y1);   y1 += 32;
+            __m256i y00 = _mm256_unpacklo_epi8(y00lh, __m256i());
+            __m256i y01 = _mm256_unpacklo_epi8(y00lh, __m256i());
+            __m256i y10 = _mm256_unpacklo_epi8(y10lh, __m256i());
+            __m256i y11 = _mm256_unpacklo_epi8(y10lh, __m256i());
+
+            __m256i u00;
+            __m256i v00;
+            if (interleaved)
+            {
+                if (firstV)
+                {
+                    __m256i uv00 = _mm256_load_si256((__m256i*)v0); v0 += 32;
+                    u00 = _mm256_sub_epi16(_mm256_srli_epi16(uv00, 8), _mm256_set1_epi16(128));
+                    v00 = _mm256_sub_epi16(_mm256_and_si256(uv00, _mm256_set1_epi16(0xFF)), _mm256_set1_epi16(128));
+                }
+                else
+                {
+                    __m256i uv00 = _mm256_load_si256((__m256i*)u0); u0 += 32;
+                    u00 = _mm256_sub_epi16(_mm256_and_si256(uv00, _mm256_set1_epi16(0xFF)), _mm256_set1_epi16(128));
+                    v00 = _mm256_sub_epi16(_mm256_srli_epi16(uv00, 8), _mm256_set1_epi16(128));
+                }
+            }
+            else
+            {
+                u00 = _mm256_sub_epi16(_mm256_unpacklo_epi8(_mm256_castsi128_si256(_mm_load_si128((__m128i*)u0)), __m256i()), _mm256_set1_epi16(128)); u0 += 16;
+                v00 = _mm256_sub_epi16(_mm256_unpacklo_epi8(_mm256_castsi128_si256(_mm_load_si128((__m128i*)v0)), __m256i()), _mm256_set1_epi16(128)); v0 += 16;
+            }
+
+            __m256i dR = _mm256_srai_epi16(                                                                                      _mm256_mullo_epi16(v00, _mm256_set1_epi16((short)( 1.28033 * 128))),  7);
+            __m256i dG = _mm256_srai_epi16(_mm256_add_epi16(_mm256_mullo_epi16(u00, _mm256_set1_epi16((short)(-0.21482 * 128))), _mm256_mullo_epi16(v00, _mm256_set1_epi16((short)(-0.38059 * 128)))), 7);
+            __m256i dB = _mm256_srai_epi16(                 _mm256_mullo_epi16(u00, _mm256_set1_epi16((short)( 2.12798 * 128))),                                                                       7);
+
+            __m256i xR[2] = { _mm256_unpacklo_epi16(dR, dR), _mm256_unpackhi_epi16(dR, dR) };
+            __m256i xG[2] = { _mm256_unpacklo_epi16(dG, dG), _mm256_unpackhi_epi16(dG, dG) };
+            __m256i xB[2] = { _mm256_unpacklo_epi16(dB, dB), _mm256_unpackhi_epi16(dB, dB) };
+
+            __m256i t[4];
+            __m256i b[4];
+
+            t[iR] = _mm256_packus_epi16(_mm256_add_epi16(y00, xR[0]), _mm256_add_epi16(y01, xR[1]));
+            t[iG] = _mm256_packus_epi16(_mm256_add_epi16(y00, xG[0]), _mm256_add_epi16(y01, xG[1]));
+            t[iB] = _mm256_packus_epi16(_mm256_add_epi16(y00, xB[0]), _mm256_add_epi16(y01, xB[1]));
+            t[iA] = _mm256_set1_epi8(-1);
+            b[iR] = _mm256_packus_epi16(_mm256_add_epi16(y10, xR[0]), _mm256_add_epi16(y11, xR[1]));
+            b[iG] = _mm256_packus_epi16(_mm256_add_epi16(y10, xG[0]), _mm256_add_epi16(y11, xG[1]));
+            b[iB] = _mm256_packus_epi16(_mm256_add_epi16(y10, xB[0]), _mm256_add_epi16(y11, xB[1]));
+            b[iA] = _mm256_set1_epi8(-1);
+
+            _MM256_TRANSPOSE4_EPI8(t[0], t[1], t[2], t[3]);
+            _MM256_TRANSPOSE4_EPI8(b[0], b[1], b[2], b[3]);
+
+            _mm256_storeu2_m128i((__m128i*)rgb0 + 4, (__m128i*)rgb0 + 0, t[0]);
+            _mm256_storeu2_m128i((__m128i*)rgb0 + 5, (__m128i*)rgb0 + 1, t[1]);
+            _mm256_storeu2_m128i((__m128i*)rgb0 + 6, (__m128i*)rgb0 + 2, t[2]);
+            _mm256_storeu2_m128i((__m128i*)rgb0 + 7, (__m128i*)rgb0 + 3, t[3]); rgb0 += 16 * 8;
+            _mm256_storeu2_m128i((__m128i*)rgb1 + 4, (__m128i*)rgb1 + 0, b[0]);
+            _mm256_storeu2_m128i((__m128i*)rgb1 + 5, (__m128i*)rgb1 + 1, b[1]);
+            _mm256_storeu2_m128i((__m128i*)rgb1 + 6, (__m128i*)rgb1 + 2, b[2]);
+            _mm256_storeu2_m128i((__m128i*)rgb1 + 7, (__m128i*)rgb1 + 3, b[3]); rgb1 += 16 * 8;
+        }
+        if (rgbWidth == 4)
+            continue;
+#endif
         int halfWidth8 = (rgbWidth == 4) ? halfWidth / 8 : 0;
         for (int w = 0; w < halfWidth8; ++w)
         {
@@ -162,14 +245,14 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
             _MM_TRANSPOSE4_EPI8(t[0], t[1], t[2], t[3]);
             _MM_TRANSPOSE4_EPI8(b[0], b[1], b[2], b[3]);
 
-            _mm_storeu_si128((__m128i*)rgb0, t[0]); rgb0 += 16;
-            _mm_storeu_si128((__m128i*)rgb0, t[1]); rgb0 += 16;
-            _mm_storeu_si128((__m128i*)rgb0, t[2]); rgb0 += 16;
-            _mm_storeu_si128((__m128i*)rgb0, t[3]); rgb0 += 16;
-            _mm_storeu_si128((__m128i*)rgb1, b[0]); rgb1 += 16;
-            _mm_storeu_si128((__m128i*)rgb1, b[1]); rgb1 += 16;
-            _mm_storeu_si128((__m128i*)rgb1, b[2]); rgb1 += 16;
-            _mm_storeu_si128((__m128i*)rgb1, b[3]); rgb1 += 16;
+            _mm_storeu_si128((__m128i*)rgb0 + 0, t[0]);
+            _mm_storeu_si128((__m128i*)rgb0 + 1, t[1]);
+            _mm_storeu_si128((__m128i*)rgb0 + 2, t[2]);
+            _mm_storeu_si128((__m128i*)rgb0 + 3, t[3]); rgb0 += 16 * 4;
+            _mm_storeu_si128((__m128i*)rgb1 + 0, b[0]);
+            _mm_storeu_si128((__m128i*)rgb1 + 1, b[1]);
+            _mm_storeu_si128((__m128i*)rgb1 + 2, b[2]);
+            _mm_storeu_si128((__m128i*)rgb1 + 3, b[3]); rgb1 += 16 * 4;
         }
         if (rgbWidth == 4)
             continue;
