@@ -94,9 +94,9 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
                 v00 = vreinterpretq_s16_u16(vsubl_u8(vld1_u8(v0), vdup_n_u8(128))); v0 += 8;
             }
 
-            int16x8_t dR = vshrq_n_s16(                                                     vmulq_n_s16(v00, (short)( 1.28033 * 128)),  7);
-            int16x8_t dG = vshrq_n_s16(vaddq_s16(vmulq_n_s16(u00, (short)(-0.21482 * 128)), vmulq_n_s16(v00, (short)(-0.38059 * 128))), 7);
-            int16x8_t dB = vshrq_n_s16(          vmulq_n_s16(u00, (short)( 2.12798 * 128)),                                             7);
+            int16x8_t dR = vshrq_n_s16(                                           vmulq_n_s16(v00, (short)( 1.28033 * 128)), 7);
+            int16x8_t dG = vshrq_n_s16(vmlaq_n_s16(vmulq_n_s16(u00, (short)(-0.21482 * 256)), v00, (short)(-0.38059 * 256)), 8);
+            int16x8_t dB = vshrq_n_s16(            vmulq_n_s16(u00, (short)( 2.12798 *  64)),                                6);
 
             int16x8x2_t xR = vzipq_s16(dR, dR);
             int16x8x2_t xG = vzipq_s16(dG, dG);
@@ -105,13 +105,13 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
             uint8x16x4_t t;
             uint8x16x4_t b;
 
-            t.val[iR] = vcombine_u8(vqmovun_s16(vqaddq_s16(y00, xR.val[0])), vqmovun_s16(vqaddq_s16(y01, xR.val[1])));
-            t.val[iG] = vcombine_u8(vqmovun_s16(vqaddq_s16(y00, xG.val[0])), vqmovun_s16(vqaddq_s16(y01, xG.val[1])));
-            t.val[iB] = vcombine_u8(vqmovun_s16(vqaddq_s16(y00, xB.val[0])), vqmovun_s16(vqaddq_s16(y01, xB.val[1])));
+            t.val[iR] = vcombine_u8(vqmovun_s16(vaddq_s16(y00, xR.val[0])), vqmovun_s16(vaddq_s16(y01, xR.val[1])));
+            t.val[iG] = vcombine_u8(vqmovun_s16(vaddq_s16(y00, xG.val[0])), vqmovun_s16(vaddq_s16(y01, xG.val[1])));
+            t.val[iB] = vcombine_u8(vqmovun_s16(vaddq_s16(y00, xB.val[0])), vqmovun_s16(vaddq_s16(y01, xB.val[1])));
             t.val[iA] = vdupq_n_u8(255);
-            b.val[iR] = vcombine_u8(vqmovun_s16(vqaddq_s16(y10, xR.val[0])), vqmovun_s16(vqaddq_s16(y11, xR.val[1])));
-            b.val[iG] = vcombine_u8(vqmovun_s16(vqaddq_s16(y10, xG.val[0])), vqmovun_s16(vqaddq_s16(y11, xG.val[1])));
-            b.val[iB] = vcombine_u8(vqmovun_s16(vqaddq_s16(y10, xB.val[0])), vqmovun_s16(vqaddq_s16(y11, xB.val[1])));
+            b.val[iR] = vcombine_u8(vqmovun_s16(vaddq_s16(y10, xR.val[0])), vqmovun_s16(vaddq_s16(y11, xR.val[1])));
+            b.val[iG] = vcombine_u8(vqmovun_s16(vaddq_s16(y10, xG.val[0])), vqmovun_s16(vaddq_s16(y11, xG.val[1])));
+            b.val[iB] = vcombine_u8(vqmovun_s16(vaddq_s16(y10, xB.val[0])), vqmovun_s16(vaddq_s16(y11, xB.val[1])));
             b.val[iA] = vdupq_n_u8(255);
 
             vst4q_u8(rgb0, t);  rgb0 += 16 * 4;
@@ -155,8 +155,8 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
             }
 
             __m256i dR = _mm256_srai_epi16(                                                                                      _mm256_mullo_epi16(v00, _mm256_set1_epi16((short)( 1.28033 * 128))),  7);
-            __m256i dG = _mm256_srai_epi16(_mm256_add_epi16(_mm256_mullo_epi16(u00, _mm256_set1_epi16((short)(-0.21482 * 128))), _mm256_mullo_epi16(v00, _mm256_set1_epi16((short)(-0.38059 * 128)))), 7);
-            __m256i dB = _mm256_srai_epi16(                 _mm256_mullo_epi16(u00, _mm256_set1_epi16((short)( 2.12798 * 128))),                                                                       7);
+            __m256i dG = _mm256_srai_epi16(_mm256_add_epi16(_mm256_mullo_epi16(u00, _mm256_set1_epi16((short)(-0.21482 * 256))), _mm256_mullo_epi16(v00, _mm256_set1_epi16((short)(-0.38059 * 256)))), 8);
+            __m256i dB = _mm256_srai_epi16(                 _mm256_mullo_epi16(u00, _mm256_set1_epi16((short)( 2.12798 *  64))),                                                                       6);
 
             __m256i xR[2] = { _mm256_unpacklo_epi16(dR, dR), _mm256_unpackhi_epi16(dR, dR) };
             __m256i xG[2] = { _mm256_unpacklo_epi16(dG, dG), _mm256_unpackhi_epi16(dG, dG) };
@@ -223,8 +223,8 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
             }
 
             __m128i dR = _mm_srai_epi16(                                                                             _mm_mullo_epi16(v00, _mm_set1_epi16((short)( 1.28033 * 128))),  7);
-            __m128i dG = _mm_srai_epi16(_mm_add_epi16(_mm_mullo_epi16(u00, _mm_set1_epi16((short)(-0.21482 * 128))), _mm_mullo_epi16(v00, _mm_set1_epi16((short)(-0.38059 * 128)))), 7);
-            __m128i dB = _mm_srai_epi16(              _mm_mullo_epi16(u00, _mm_set1_epi16((short)( 2.12798 * 128))),                                                                 7);
+            __m128i dG = _mm_srai_epi16(_mm_add_epi16(_mm_mullo_epi16(u00, _mm_set1_epi16((short)(-0.21482 * 256))), _mm_mullo_epi16(v00, _mm_set1_epi16((short)(-0.38059 * 256)))), 8);
+            __m128i dB = _mm_srai_epi16(              _mm_mullo_epi16(u00, _mm_set1_epi16((short)( 2.12798 *  64))),                                                                 6);
 
             __m128i xR[2] = { _mm_unpacklo_epi16(dR, dR), _mm_unpackhi_epi16(dR, dR) };
             __m128i xG[2] = { _mm_unpacklo_epi16(dG, dG), _mm_unpackhi_epi16(dG, dG) };
@@ -277,8 +277,8 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
             // G = 1 -0.21482 -0.38059
             // B = 1  2.12798  0.00000
             int dR = (                              v00 * (int)( 1.28033 * 128)) >> 7;
-            int dG = (u00 * (int)(-0.21482 * 128) + v00 * (int)(-0.38059 * 128)) >> 7;
-            int dB = (u00 * (int)( 2.12798 * 128)                              ) >> 7;
+            int dG = (u00 * (int)(-0.21482 * 256) + v00 * (int)(-0.38059 * 256)) >> 8;
+            int dB = (u00 * (int)( 2.12798 *  64)                              ) >> 6;
 
             auto clamp = [](int value) -> unsigned char
             {
