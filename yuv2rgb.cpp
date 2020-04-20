@@ -69,49 +69,61 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
             uint8x8_t y10 = vget_low_u8(y10lh);
             uint8x8_t y11 = vget_high_u8(y10lh);
 
-            int16x8_t u00;
-            int16x8_t v00;
+            int8x8_t u000;
+            int8x8_t v000;
             if (interleaved)
             {
                 if (firstV)
                 {
-                    uint8x16_t uv00 = vld1q_u8(v0); v0 += 16;
-                    uint8x8x2_t uv00lh = vuzp_u8(vget_low_u8(uv00), vget_high_u8(uv00));
-                    u00 = vreinterpretq_s16_u16(vsubl_u8(uv00lh.val[1], vdup_n_u8(128)));
-                    v00 = vreinterpretq_s16_u16(vsubl_u8(uv00lh.val[0], vdup_n_u8(128)));
+                    int8x16_t uv00 = vld1q_u8(v0); v0 += 16;
+                    int8x8x2_t uv00lh = vuzp_s8(vget_low_s8(uv00), vget_high_s8(uv00));
+                    int8x16_t uv000 = vaddq_s8(vcombine_s8(uv00lh.val[1], uv00lh.val[0]), vdupq_n_s8(-128));
+                    u000 = vget_low_s8(uv000);
+                    v000 = vget_high_s8(uv000);
                 }
                 else
                 {
-                    uint8x16_t uv00 = vld1q_u8(u0); u0 += 16;
-                    uint8x8x2_t uv00lh = vuzp_u8(vget_low_u8(uv00), vget_high_u8(uv00));
-                    u00 = vreinterpretq_s16_u16(vsubl_u8(uv00lh.val[0], vdup_n_u8(128)));
-                    v00 = vreinterpretq_s16_u16(vsubl_u8(uv00lh.val[1], vdup_n_u8(128)));
+                    int8x16_t uv00 = vld1q_u8(u0); u0 += 16;
+                    int8x8x2_t uv00lh = vuzp_s8(vget_low_s8(uv00), vget_high_s8(uv00));
+                    int8x16_t uv000 = vaddq_s8(vcombine_s8(uv00lh.val[0], uv00lh.val[1]), vdupq_n_s8(-128));
+                    u000 = vget_low_s8(uv000);
+                    v000 = vget_high_s8(uv000);
                 }
             }
             else
             {
-                u00 = vreinterpretq_s16_u16(vsubl_u8(vld1_u8(u0), vdup_n_u8(128))); u0 += 8;
-                v00 = vreinterpretq_s16_u16(vsubl_u8(vld1_u8(v0), vdup_n_u8(128))); v0 += 8;
+                int8x16_t uv000 = vaddq_s8(vcombine_s8(vld1_u8(u0), vld1_u8(v0)), vdupq_n_s8(-128)); u0 += 8; v0 += 8;
+                u000 = vget_low_s8(uv000);
+                v000 = vget_high_s8(uv000);
             }
+
+#if 1
+            int16x8_t dR = vshrq_n_s16(                                                   vmull_s8(v000, vdup_n_s8((char)( 1.28033 *  64))), 6);
+            int16x8_t dG = vshrq_n_s16(vmlal_s8(vmull_s8(u000, vdup_n_s8((char)(-0.21482 * 256))), v000, vdup_n_s8((char)(-0.38059 * 256))), 8);
+            int16x8_t dB = vshrq_n_s16(         vmull_s8(u000, vdup_n_s8((char)( 2.12798 *  32))),                                           5);
+#else
+            int16x8_t u00 = vmovl_s8(u000);
+            int16x8_t v00 = vmovl_s8(v000);
 
             int16x8_t dR = vshrq_n_s16(                                           vmulq_n_s16(v00, (short)( 1.28033 * 128)), 7);
             int16x8_t dG = vshrq_n_s16(vmlaq_n_s16(vmulq_n_s16(u00, (short)(-0.21482 * 256)), v00, (short)(-0.38059 * 256)), 8);
             int16x8_t dB = vshrq_n_s16(            vmulq_n_s16(u00, (short)( 2.12798 *  64)),                                6);
+#endif
 
-            int16x8x2_t xR = vzipq_s16(dR, dR);
-            int16x8x2_t xG = vzipq_s16(dG, dG);
-            int16x8x2_t xB = vzipq_s16(dB, dB);
+            uint16x8x2_t xR = vzipq_u16(vreinterpretq_u16_s16(dR), vreinterpretq_u16_s16(dR));
+            uint16x8x2_t xG = vzipq_u16(vreinterpretq_u16_s16(dG), vreinterpretq_u16_s16(dG));
+            uint16x8x2_t xB = vzipq_u16(vreinterpretq_u16_s16(dB), vreinterpretq_u16_s16(dB));
 
             uint8x16x4_t t;
             uint8x16x4_t b;
 
-            t.val[iR] = vcombine_u8(vqmovun_s16(vaddw_u8(vreinterpretq_u16_s16(xR.val[0]), y00)), vqmovun_s16(vaddw_u8(vreinterpretq_u16_s16(xR.val[1]), y01)));
-            t.val[iG] = vcombine_u8(vqmovun_s16(vaddw_u8(vreinterpretq_u16_s16(xG.val[0]), y00)), vqmovun_s16(vaddw_u8(vreinterpretq_u16_s16(xG.val[1]), y01)));
-            t.val[iB] = vcombine_u8(vqmovun_s16(vaddw_u8(vreinterpretq_u16_s16(xB.val[0]), y00)), vqmovun_s16(vaddw_u8(vreinterpretq_u16_s16(xB.val[1]), y01)));
+            t.val[iR] = vcombine_u8(vqmovun_s16(vaddw_u8(xR.val[0], y00)), vqmovun_s16(vaddw_u8(xR.val[1], y01)));
+            t.val[iG] = vcombine_u8(vqmovun_s16(vaddw_u8(xG.val[0], y00)), vqmovun_s16(vaddw_u8(xG.val[1], y01)));
+            t.val[iB] = vcombine_u8(vqmovun_s16(vaddw_u8(xB.val[0], y00)), vqmovun_s16(vaddw_u8(xB.val[1], y01)));
             t.val[iA] = vdupq_n_u8(255);
-            b.val[iR] = vcombine_u8(vqmovun_s16(vaddw_u8(vreinterpretq_u16_s16(xR.val[0]), y10)), vqmovun_s16(vaddw_u8(vreinterpretq_u16_s16(xR.val[1]), y11)));
-            b.val[iG] = vcombine_u8(vqmovun_s16(vaddw_u8(vreinterpretq_u16_s16(xG.val[0]), y10)), vqmovun_s16(vaddw_u8(vreinterpretq_u16_s16(xG.val[1]), y11)));
-            b.val[iB] = vcombine_u8(vqmovun_s16(vaddw_u8(vreinterpretq_u16_s16(xB.val[0]), y10)), vqmovun_s16(vaddw_u8(vreinterpretq_u16_s16(xB.val[1]), y11)));
+            b.val[iR] = vcombine_u8(vqmovun_s16(vaddw_u8(xR.val[0], y10)), vqmovun_s16(vaddw_u8(xR.val[1], y11)));
+            b.val[iG] = vcombine_u8(vqmovun_s16(vaddw_u8(xG.val[0], y10)), vqmovun_s16(vaddw_u8(xG.val[1], y11)));
+            b.val[iB] = vcombine_u8(vqmovun_s16(vaddw_u8(xB.val[0], y10)), vqmovun_s16(vaddw_u8(xB.val[1], y11)));
             b.val[iA] = vdupq_n_u8(255);
 
             vst4q_u8(rgb0, t);  rgb0 += 16 * 4;
