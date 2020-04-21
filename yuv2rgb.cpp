@@ -6,6 +6,7 @@
 //==============================================================================
 #if defined(__ARM_NEON__) || defined(__ARM_NEON) || defined(_M_ARM) || defined(_M_ARM64)
 #   include <arm_neon.h>
+#   define NEON_FAST 1
 #elif defined(_M_IX86) || defined(_M_AMD64) || defined(__i386__) || defined(__amd64__)
 #   include <emmintrin.h>
 #   define _MM_TRANSPOSE4_EPI8(R0, R1, R2, R3) {    \
@@ -97,7 +98,7 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
                 v000 = vget_high_s8(uv000);
             }
 
-#if 1
+#if NEON_FAST
             int16x8_t dR = vshrq_n_s16(                                                   vmull_s8(v000, vdup_n_s8((char)( 1.28033 *  64))), 6);
             int16x8_t dG = vshrq_n_s16(vmlal_s8(vmull_s8(u000, vdup_n_s8((char)(-0.21482 * 256))), v000, vdup_n_s8((char)(-0.38059 * 256))), 8);
             int16x8_t dB = vshrq_n_s16(         vmull_s8(u000, vdup_n_s8((char)( 2.12798 *  32))),                                           5);
