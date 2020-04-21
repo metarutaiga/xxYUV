@@ -20,7 +20,7 @@
         R2 = _mm_unpacklo_epi16(T2, T3);            \
         R3 = _mm_unpackhi_epi16(T2, T3);            \
     }
-#   if defined(__AVX2__) && 0
+#   if defined(__AVX2__)
 #       include <immintrin.h>
 #       define _MM256_TRANSPOSE4_EPI8(R0, R1, R2, R3) { \
             __m256i T0, T1, T2, T3;                     \
@@ -37,7 +37,33 @@
 #endif
 #include "yuv2rgb.h"
 
+#define VIDEO_RANGE 0
 #define align(v, a) ((v) + ((a) - 1) & ~((a) - 1))
+
+// BT.709 - Video Range
+//     Y         U         V
+// R = 1.164384  0.000000  1.792741
+// G = 1.164384 -0.213249 -0.532909
+// B = 1.164384  2.112402  0.000000
+//
+// BT.709 - Full Range
+//     Y         U         V
+// R = 1.000000  0.000000  1.581000
+// G = 1.000000 -0.188062 -0.469967
+// B = 1.000000  1.862906  0.000000
+#if VIDEO_RANGE
+#define Y   1.164384
+#define UG -0.213249
+#define UB  2.112402
+#define VR  1.792741
+#define VG -0.532909
+#else
+#define Y   1.000000
+#define UG -0.188062
+#define UB  1.862906
+#define VR  1.581000
+#define VG -0.469967
+#endif
 
 //------------------------------------------------------------------------------
 template<int rgbWidth, bool rgbSwizzle, bool interleaved, bool firstV>
@@ -63,12 +89,21 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
         int halfWidth8 = (rgbWidth == 4) ? halfWidth / 8 : 0;
         for (int w = 0; w < halfWidth8; ++w)
         {
+#if VIDEO_RANGE
+            uint8x16_t y00lh = vqsubq_u8(vld1q_u8(y0), vdupq_n_u8(16)); y0 += 16;
+            uint8x16_t y10lh = vqsubq_u8(vld1q_u8(y1), vdupq_n_u8(16)); y1 += 16;
+            uint8x8_t y00 = vshrn_n_u16(vmull_u8(vget_low_u8(y00lh), vdup_n_u8(Y * 128)), 7);
+            uint8x8_t y01 = vshrn_n_u16(vmull_u8(vget_high_u8(y00lh), vdup_n_u8(Y * 128)), 7);
+            uint8x8_t y10 = vshrn_n_u16(vmull_u8(vget_low_u8(y10lh), vdup_n_u8(Y * 128)), 7);
+            uint8x8_t y11 = vshrn_n_u16(vmull_u8(vget_high_u8(y10lh), vdup_n_u8(Y * 128)), 7);
+#else
             uint8x16_t y00lh = vld1q_u8(y0); y0 += 16;
             uint8x16_t y10lh = vld1q_u8(y1); y1 += 16;
             uint8x8_t y00 = vget_low_u8(y00lh);
             uint8x8_t y01 = vget_high_u8(y00lh);
             uint8x8_t y10 = vget_low_u8(y10lh);
             uint8x8_t y11 = vget_high_u8(y10lh);
+#endif
 
             int8x8_t u000;
             int8x8_t v000;
@@ -99,16 +134,16 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
             }
 
 #if NEON_FAST
-            int16x8_t dR = vshrq_n_s16(                                                   vmull_s8(v000, vdup_n_s8((char)( 1.28033 *  64))), 6);
-            int16x8_t dG = vshrq_n_s16(vmlal_s8(vmull_s8(u000, vdup_n_s8((char)(-0.21482 * 256))), v000, vdup_n_s8((char)(-0.38059 * 256))), 8);
-            int16x8_t dB = vshrq_n_s16(         vmull_s8(u000, vdup_n_s8((char)( 2.12798 *  32))),                                           5);
+            int16x8_t dR = vshrq_n_s16(                                     vmull_s8(v000, vdup_n_s8(VR *  64)), 6);
+            int16x8_t dG = vshrq_n_s16(vmlal_s8(vmull_s8(u000, vdup_n_s8(UG * 128)), v000, vdup_n_s8(VG * 128)), 7);
+            int16x8_t dB = vshrq_n_s16(         vmull_s8(u000, vdup_n_s8(UB *  32)),                             5);
 #else
             int16x8_t u00 = vmovl_s8(u000);
             int16x8_t v00 = vmovl_s8(v000);
 
-            int16x8_t dR = vshrq_n_s16(                                           vmulq_n_s16(v00, (short)( 1.28033 * 128)), 7);
-            int16x8_t dG = vshrq_n_s16(vmlaq_n_s16(vmulq_n_s16(u00, (short)(-0.21482 * 256)), v00, (short)(-0.38059 * 256)), 8);
-            int16x8_t dB = vshrq_n_s16(            vmulq_n_s16(u00, (short)( 2.12798 *  64)),                                6);
+            int16x8_t dR = vshrq_n_s16(                            vmulq_n_s16(v00, VR * 128), 7);
+            int16x8_t dG = vshrq_n_s16(vmlaq_n_s16(vmulq_n_s16(u00, UG * 256), v00, VG * 256), 8);
+            int16x8_t dB = vshrq_n_s16(            vmulq_n_s16(u00, UB *  64),                 6);
 #endif
 
             uint16x8x2_t xR = vzipq_u16(vreinterpretq_u16_s16(dR), vreinterpretq_u16_s16(dR));
@@ -133,16 +168,25 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
         if (rgbWidth == 4)
             continue;
 #elif defined(_M_IX86) || defined(_M_AMD64) || defined(__i386__) || defined(__amd64__)
-#if defined(__AVX2__) && 0
+#if defined(__AVX2__)
         int halfWidth16 = (rgbWidth == 4) ? halfWidth / 16 : 0;
         for (int w = 0; w < halfWidth16; ++w)
         {
+#if VIDEO_RANGE
+            __m256i y00lh = _mm256_subs_epu8(_mm256_loadu_si256((__m256i*)y0), _mm256_set1_epi8(16));   y0 += 32;
+            __m256i y10lh = _mm256_subs_epu8(_mm256_loadu_si256((__m256i*)y1), _mm256_set1_epi8(16));   y1 += 32;
+            __m256i y00 = _mm256_srai_epi16(_mm256_mullo_epi16(_mm256_unpacklo_epi8(y00lh, __m256i()), _mm256_set1_epi16(Y * 128)), 7);
+            __m256i y01 = _mm256_srai_epi16(_mm256_mullo_epi16(_mm256_unpackhi_epi8(y00lh, __m256i()), _mm256_set1_epi16(Y * 128)), 7);
+            __m256i y10 = _mm256_srai_epi16(_mm256_mullo_epi16(_mm256_unpacklo_epi8(y10lh, __m256i()), _mm256_set1_epi16(Y * 128)), 7);
+            __m256i y11 = _mm256_srai_epi16(_mm256_mullo_epi16(_mm256_unpackhi_epi8(y10lh, __m256i()), _mm256_set1_epi16(Y * 128)), 7);
+#else
             __m256i y00lh = _mm256_load_si256((__m256i*)y0);   y0 += 32;
             __m256i y10lh = _mm256_load_si256((__m256i*)y1);   y1 += 32;
             __m256i y00 = _mm256_unpacklo_epi8(y00lh, __m256i());
-            __m256i y01 = _mm256_unpacklo_epi8(y00lh, __m256i());
+            __m256i y01 = _mm256_unpackhi_epi8(y00lh, __m256i());
             __m256i y10 = _mm256_unpacklo_epi8(y10lh, __m256i());
-            __m256i y11 = _mm256_unpacklo_epi8(y10lh, __m256i());
+            __m256i y11 = _mm256_unpackhi_epi8(y10lh, __m256i());
+#endif
 
             __m256i u00;
             __m256i v00;
@@ -167,9 +211,9 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
                 v00 = _mm256_sub_epi16(_mm256_unpacklo_epi8(_mm256_castsi128_si256(_mm_load_si128((__m128i*)v0)), __m256i()), _mm256_set1_epi16(128)); v0 += 16;
             }
 
-            __m256i dR = _mm256_srai_epi16(                                                                                      _mm256_mullo_epi16(v00, _mm256_set1_epi16((short)( 1.28033 * 128))),  7);
-            __m256i dG = _mm256_srai_epi16(_mm256_add_epi16(_mm256_mullo_epi16(u00, _mm256_set1_epi16((short)(-0.21482 * 256))), _mm256_mullo_epi16(v00, _mm256_set1_epi16((short)(-0.38059 * 256)))), 8);
-            __m256i dB = _mm256_srai_epi16(                 _mm256_mullo_epi16(u00, _mm256_set1_epi16((short)( 2.12798 *  64))),                                                                       6);
+            __m256i dR = _mm256_srai_epi16(                                                                       _mm256_mullo_epi16(v00, _mm256_set1_epi16(VR * 128)),  7);
+            __m256i dG = _mm256_srai_epi16(_mm256_add_epi16(_mm256_mullo_epi16(u00, _mm256_set1_epi16(UG * 256)), _mm256_mullo_epi16(v00, _mm256_set1_epi16(VG * 256))), 8);
+            __m256i dB = _mm256_srai_epi16(                 _mm256_mullo_epi16(u00, _mm256_set1_epi16(UB *  64)),                                                        6);
 
             __m256i xR[2] = { _mm256_unpacklo_epi16(dR, dR), _mm256_unpackhi_epi16(dR, dR) };
             __m256i xG[2] = { _mm256_unpacklo_epi16(dG, dG), _mm256_unpackhi_epi16(dG, dG) };
@@ -205,12 +249,21 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
         int halfWidth8 = (rgbWidth == 4) ? halfWidth / 8 : 0;
         for (int w = 0; w < halfWidth8; ++w)
         {
+#if VIDEO_RANGE
+            __m128i y00lh = _mm_subs_epu8(_mm_loadu_si128((__m128i*)y0), _mm_set1_epi8(16));    y0 += 16;
+            __m128i y10lh = _mm_subs_epu8(_mm_loadu_si128((__m128i*)y1), _mm_set1_epi8(16));    y1 += 16;
+            __m128i y00 = _mm_srai_epi16(_mm_mullo_epi16(_mm_unpacklo_epi8(y00lh, __m128i()), _mm_set1_epi16(Y * 128)), 7);
+            __m128i y01 = _mm_srai_epi16(_mm_mullo_epi16(_mm_unpackhi_epi8(y00lh, __m128i()), _mm_set1_epi16(Y * 128)), 7);
+            __m128i y10 = _mm_srai_epi16(_mm_mullo_epi16(_mm_unpacklo_epi8(y10lh, __m128i()), _mm_set1_epi16(Y * 128)), 7);
+            __m128i y11 = _mm_srai_epi16(_mm_mullo_epi16(_mm_unpackhi_epi8(y10lh, __m128i()), _mm_set1_epi16(Y * 128)), 7);
+#else
             __m128i y00lh = _mm_loadu_si128((__m128i*)y0);  y0 += 16;
             __m128i y10lh = _mm_loadu_si128((__m128i*)y1);  y1 += 16;
             __m128i y00 = _mm_unpacklo_epi8(y00lh, __m128i());
             __m128i y01 = _mm_unpackhi_epi8(y00lh, __m128i());
             __m128i y10 = _mm_unpacklo_epi8(y10lh, __m128i());
             __m128i y11 = _mm_unpackhi_epi8(y10lh, __m128i());
+#endif
 
             __m128i u00;
             __m128i v00;
@@ -235,9 +288,9 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
                 v00 = _mm_sub_epi16(_mm_unpacklo_epi8(_mm_loadl_epi64((__m128i*)v0), __m128i()), _mm_set1_epi16(128));  v0 += 8;
             }
 
-            __m128i dR = _mm_srai_epi16(                                                                             _mm_mullo_epi16(v00, _mm_set1_epi16((short)( 1.28033 * 128))),  7);
-            __m128i dG = _mm_srai_epi16(_mm_add_epi16(_mm_mullo_epi16(u00, _mm_set1_epi16((short)(-0.21482 * 256))), _mm_mullo_epi16(v00, _mm_set1_epi16((short)(-0.38059 * 256)))), 8);
-            __m128i dB = _mm_srai_epi16(              _mm_mullo_epi16(u00, _mm_set1_epi16((short)( 2.12798 *  64))),                                                                 6);
+            __m128i dR = _mm_srai_epi16(                                                              _mm_mullo_epi16(v00, _mm_set1_epi16(VR * 128)),  7);
+            __m128i dG = _mm_srai_epi16(_mm_add_epi16(_mm_mullo_epi16(u00, _mm_set1_epi16(UG * 256)), _mm_mullo_epi16(v00, _mm_set1_epi16(VG * 256))), 8);
+            __m128i dB = _mm_srai_epi16(              _mm_mullo_epi16(u00, _mm_set1_epi16(UB *  64)),                                                  6);
 
             __m128i xR[2] = { _mm_unpacklo_epi16(dR, dR), _mm_unpackhi_epi16(dR, dR) };
             __m128i xG[2] = { _mm_unpacklo_epi16(dG, dG), _mm_unpackhi_epi16(dG, dG) };
@@ -272,10 +325,17 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
 #endif
         for (int w = 0; w < halfWidth; ++w)
         {
+#if VIDEO_RANGE
+            int y00 = (((*y0++) - 16) * (int)(Y * 128)) >> 7;
+            int y01 = (((*y0++) - 16) * (int)(Y * 128)) >> 7;
+            int y10 = (((*y1++) - 16) * (int)(Y * 128)) >> 7;
+            int y11 = (((*y1++) - 16) * (int)(Y * 128)) >> 7;
+#else
             int y00 = (*y0++);
             int y01 = (*y0++);
             int y10 = (*y1++);
             int y11 = (*y1++);
+#endif
             int u00 = (*u0++) - 128;
             int v00 = (*v0++) - 128;
             if (interleaved)
@@ -284,14 +344,9 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
                 v0++;
             }
 
-            // BT.709
-            //     Y        U        V
-            // R = 1  0.00000  1.28033
-            // G = 1 -0.21482 -0.38059
-            // B = 1  2.12798  0.00000
-            int dR = (                              v00 * (int)( 1.28033 * 128)) >> 7;
-            int dG = (u00 * (int)(-0.21482 * 256) + v00 * (int)(-0.38059 * 256)) >> 8;
-            int dB = (u00 * (int)( 2.12798 *  64)                              ) >> 6;
+            int dR = (                        v00 * (int)(VR * 128)) >> 7;
+            int dG = (u00 * (int)(UG * 256) + v00 * (int)(VG * 256)) >> 8;
+            int dB = (u00 * (int)(UB *  64)                        ) >> 6;
 
             auto clamp = [](int value) -> unsigned char
             {
