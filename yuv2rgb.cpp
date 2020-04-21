@@ -194,26 +194,26 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
             {
                 if (firstV)
                 {
-                    __m256i uv00 = _mm256_load_si256((__m256i*)v0); v0 += 32;
-                    u00 = _mm256_sub_epi16(_mm256_srli_epi16(uv00, 8), _mm256_set1_epi16(128));
-                    v00 = _mm256_sub_epi16(_mm256_and_si256(uv00, _mm256_set1_epi16(0xFF)), _mm256_set1_epi16(128));
+                    __m256i uv00 = _mm256_loadu_si256((__m256i*)v0);   v0 += 32;
+                    u00 = _mm256_add_epi16(_mm256_and_si256(uv00, _mm256_set1_epi16(0xFF00)), _mm256_set1_epi16(-32768));
+                    v00 = _mm256_add_epi16(_mm256_slli_epi16(uv00, 8), _mm256_set1_epi16(-32768));
                 }
                 else
                 {
-                    __m256i uv00 = _mm256_load_si256((__m256i*)u0); u0 += 32;
-                    u00 = _mm256_sub_epi16(_mm256_and_si256(uv00, _mm256_set1_epi16(0xFF)), _mm256_set1_epi16(128));
-                    v00 = _mm256_sub_epi16(_mm256_srli_epi16(uv00, 8), _mm256_set1_epi16(128));
+                    __m256i uv00 = _mm256_loadu_si256((__m256i*)u0);   u0 += 32;
+                    u00 = _mm256_add_epi16(_mm256_slli_epi16(uv00, 8), _mm256_set1_epi16(-32768));
+                    v00 = _mm256_add_epi16(_mm256_and_si256(uv00, _mm256_set1_epi16(0xFF00)), _mm256_set1_epi16(-32768));
                 }
             }
             else
             {
-                u00 = _mm256_sub_epi16(_mm256_unpacklo_epi8(_mm256_castsi128_si256(_mm_load_si128((__m128i*)u0)), __m256i()), _mm256_set1_epi16(128)); u0 += 16;
-                v00 = _mm256_sub_epi16(_mm256_unpacklo_epi8(_mm256_castsi128_si256(_mm_load_si128((__m128i*)v0)), __m256i()), _mm256_set1_epi16(128)); v0 += 16;
+                u00 = _mm256_add_epi16(_mm256_slli_epi16(_mm256_cvtepu8_epi16(_mm_load_si128((__m128i*)u0)), 8), _mm256_set1_epi16(-32768));  u0 += 16;
+                v00 = _mm256_add_epi16(_mm256_slli_epi16(_mm256_cvtepu8_epi16(_mm_load_si128((__m128i*)v0)), 8), _mm256_set1_epi16(-32768));  v0 += 16;
             }
 
-            __m256i dR = _mm256_srai_epi16(                                                                       _mm256_mullo_epi16(v00, _mm256_set1_epi16(VR * 128)),  7);
-            __m256i dG = _mm256_srai_epi16(_mm256_add_epi16(_mm256_mullo_epi16(u00, _mm256_set1_epi16(UG * 256)), _mm256_mullo_epi16(v00, _mm256_set1_epi16(VG * 256))), 8);
-            __m256i dB = _mm256_srai_epi16(                 _mm256_mullo_epi16(u00, _mm256_set1_epi16(UB *  64)),                                                        6);
+            __m256i dR =                                                                        _mm256_mulhi_epi16(v00, _mm256_set1_epi16(VR * 256));
+            __m256i dG = _mm256_add_epi16(_mm256_mulhi_epi16(u00, _mm256_set1_epi16(UG * 256)), _mm256_mulhi_epi16(v00, _mm256_set1_epi16(VG * 256)));
+            __m256i dB =                  _mm256_mulhi_epi16(u00, _mm256_set1_epi16(UB * 256));
 
             __m256i xR[2] = { _mm256_unpacklo_epi16(dR, dR), _mm256_unpackhi_epi16(dR, dR) };
             __m256i xG[2] = { _mm256_unpacklo_epi16(dG, dG), _mm256_unpackhi_epi16(dG, dG) };
@@ -272,25 +272,25 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
                 if (firstV)
                 {
                     __m128i uv00 = _mm_loadu_si128((__m128i*)v0);   v0 += 16;
-                    u00 = _mm_sub_epi16(_mm_srli_epi16(uv00, 8), _mm_set1_epi16(128));
-                    v00 = _mm_sub_epi16(_mm_and_si128(uv00, _mm_set1_epi16(0xFF)), _mm_set1_epi16(128));
+                    u00 = _mm_add_epi16(_mm_and_si128(uv00, _mm_set1_epi16(0xFF00)), _mm_set1_epi16(-32768));
+                    v00 = _mm_add_epi16(_mm_slli_epi16(uv00, 8), _mm_set1_epi16(-32768));
                 }
                 else
                 {
                     __m128i uv00 = _mm_loadu_si128((__m128i*)u0);   u0 += 16;
-                    u00 = _mm_sub_epi16(_mm_and_si128(uv00, _mm_set1_epi16(0xFF)), _mm_set1_epi16(128));
-                    v00 = _mm_sub_epi16(_mm_srli_epi16(uv00, 8), _mm_set1_epi16(128));
+                    u00 = _mm_add_epi16(_mm_slli_epi16(uv00, 8), _mm_set1_epi16(-32768));
+                    v00 = _mm_add_epi16(_mm_and_si128(uv00, _mm_set1_epi16(0xFF00)), _mm_set1_epi16(-32768));
                 }
             }
             else
             {
-                u00 = _mm_sub_epi16(_mm_unpacklo_epi8(_mm_loadl_epi64((__m128i*)u0), __m128i()), _mm_set1_epi16(128));  u0 += 8;
-                v00 = _mm_sub_epi16(_mm_unpacklo_epi8(_mm_loadl_epi64((__m128i*)v0), __m128i()), _mm_set1_epi16(128));  v0 += 8;
+                u00 = _mm_add_epi16(_mm_unpacklo_epi8(__m128i(), _mm_loadl_epi64((__m128i*)u0)), _mm_set1_epi16(-32768));  u0 += 8;
+                v00 = _mm_add_epi16(_mm_unpacklo_epi8(__m128i(), _mm_loadl_epi64((__m128i*)v0)), _mm_set1_epi16(-32768));  v0 += 8;
             }
 
-            __m128i dR = _mm_srai_epi16(                                                              _mm_mullo_epi16(v00, _mm_set1_epi16(VR * 128)),  7);
-            __m128i dG = _mm_srai_epi16(_mm_add_epi16(_mm_mullo_epi16(u00, _mm_set1_epi16(UG * 256)), _mm_mullo_epi16(v00, _mm_set1_epi16(VG * 256))), 8);
-            __m128i dB = _mm_srai_epi16(              _mm_mullo_epi16(u00, _mm_set1_epi16(UB *  64)),                                                  6);
+            __m128i dR =                                                               _mm_mulhi_epi16(v00, _mm_set1_epi16(VR * 256));
+            __m128i dG = _mm_add_epi16(_mm_mulhi_epi16(u00, _mm_set1_epi16(UG * 256)), _mm_mulhi_epi16(v00, _mm_set1_epi16(VG * 256)));
+            __m128i dB =               _mm_mulhi_epi16(u00, _mm_set1_epi16(UB * 256));
 
             __m128i xR[2] = { _mm_unpacklo_epi16(dR, dR), _mm_unpackhi_epi16(dR, dR) };
             __m128i xG[2] = { _mm_unpacklo_epi16(dG, dG), _mm_unpackhi_epi16(dG, dG) };
