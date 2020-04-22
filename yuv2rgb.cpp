@@ -113,12 +113,16 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
         {
             uint8x16_t y00lh = vld1q_u8(y0); y0 += 16;
             uint8x16_t y10lh = vld1q_u8(y1); y1 += 16;
-            uint8x8_t y00 = vget_low_u8(y00lh);
-            uint8x8_t y01 = vget_high_u8(y00lh);
-            uint8x8_t y10 = vget_low_u8(y10lh);
-            uint8x8_t y11 = vget_high_u8(y10lh);
+            uint8x8_t y00;
+            uint8x8_t y01;
+            uint8x8_t y10;
+            uint8x8_t y11;
             if (fullRange)
             {
+                y00 = vget_low_u8(y00lh);
+                y01 = vget_high_u8(y00lh);
+                y10 = vget_low_u8(y10lh);
+                y11 = vget_high_u8(y10lh);
             }
             else
             {
