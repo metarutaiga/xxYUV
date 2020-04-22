@@ -6,7 +6,6 @@
 //==============================================================================
 #include "rgb2yuv.h"
 
-#define VIDEO_RANGE 0
 #define align(v, a) ((v) + ((a) - 1) & ~((a) - 1))
 
 // BT.709 - Video Range
