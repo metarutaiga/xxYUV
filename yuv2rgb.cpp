@@ -7,6 +7,32 @@
 #if defined(__ARM_NEON__) || defined(__ARM_NEON) || defined(_M_ARM) || defined(_M_ARM64)
 #   include <arm_neon.h>
 #   define NEON_FAST 1
+#elif defined(__AVX512F__) && defined(__AVX512BW__) && 0
+#   include <immintrin.h>
+#   define _MM512_TRANSPOSE4_EPI8(R0, R1, R2, R3) { \
+        __m512i T0, T1, T2, T3;                     \
+        T0 = _mm512_unpacklo_epi8(R0, R1);          \
+        T1 = _mm512_unpacklo_epi8(R2, R3);          \
+        T2 = _mm512_unpackhi_epi8(R0, R1);          \
+        T3 = _mm512_unpackhi_epi8(R2, R3);          \
+        R0 = _mm512_unpacklo_epi16(T0, T1);         \
+        R1 = _mm512_unpackhi_epi16(T0, T1);         \
+        R2 = _mm512_unpacklo_epi16(T2, T3);         \
+        R3 = _mm512_unpackhi_epi16(T2, T3);         \
+    }
+#elif defined(__AVX2__)
+#   include <immintrin.h>
+#   define _MM256_TRANSPOSE4_EPI8(R0, R1, R2, R3) { \
+        __m256i T0, T1, T2, T3;                     \
+        T0 = _mm256_unpacklo_epi8(R0, R1);          \
+        T1 = _mm256_unpacklo_epi8(R2, R3);          \
+        T2 = _mm256_unpackhi_epi8(R0, R1);          \
+        T3 = _mm256_unpackhi_epi8(R2, R3);          \
+        R0 = _mm256_unpacklo_epi16(T0, T1);         \
+        R1 = _mm256_unpackhi_epi16(T0, T1);         \
+        R2 = _mm256_unpacklo_epi16(T2, T3);         \
+        R3 = _mm256_unpackhi_epi16(T2, T3);         \
+    }
 #elif defined(_M_IX86) || defined(_M_AMD64) || defined(__i386__) || defined(__amd64__)
 #   include <emmintrin.h>
 #   define _MM_TRANSPOSE4_EPI8(R0, R1, R2, R3) {    \
@@ -20,24 +46,10 @@
         R2 = _mm_unpacklo_epi16(T2, T3);            \
         R3 = _mm_unpackhi_epi16(T2, T3);            \
     }
-#   if defined(__AVX2__)
-#       include <immintrin.h>
-#       define _MM256_TRANSPOSE4_EPI8(R0, R1, R2, R3) { \
-            __m256i T0, T1, T2, T3;                     \
-            T0 = _mm256_unpacklo_epi8(R0, R1);          \
-            T1 = _mm256_unpacklo_epi8(R2, R3);          \
-            T2 = _mm256_unpackhi_epi8(R0, R1);          \
-            T3 = _mm256_unpackhi_epi8(R2, R3);          \
-            R0 = _mm256_unpacklo_epi16(T0, T1);         \
-            R1 = _mm256_unpackhi_epi16(T0, T1);         \
-            R2 = _mm256_unpacklo_epi16(T2, T3);         \
-            R3 = _mm256_unpackhi_epi16(T2, T3);         \
-        }
-#   endif
 #endif
 #include "yuv2rgb.h"
 
-#define VIDEO_RANGE 0
+#define VIDEO_RANGE 1
 #define align(v, a) ((v) + ((a) - 1) & ~((a) - 1))
 
 // BT.709 - Video Range
@@ -167,18 +179,118 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
         }
         if (rgbWidth == 4)
             continue;
-#elif defined(_M_IX86) || defined(_M_AMD64) || defined(__i386__) || defined(__amd64__)
-#if defined(__AVX2__)
+#elif defined(__AVX512F__) && defined(__AVX512BW__) && 0
+        int halfWidth16 = (rgbWidth == 4) ? halfWidth / 32 : 0;
+        for (int w = 0; w < halfWidth16; ++w)
+        {
+#if VIDEO_RANGE
+            __m512i y00lh = _mm512_subs_epu8(_mm512_loadu_si512((__m512i*)y0), _mm512_set1_epi8(16));   y0 += 64;
+            __m512i y10lh = _mm512_subs_epu8(_mm512_loadu_si512((__m512i*)y1), _mm512_set1_epi8(16));   y1 += 64;
+            __m512i y00 = _mm512_mulhi_epu16(_mm512_unpacklo_epi8(__m512i(), y00lh), _mm512_set1_epi16(Y * 256));
+            __m512i y01 = _mm512_mulhi_epu16(_mm512_unpackhi_epi8(__m512i(), y00lh), _mm512_set1_epi16(Y * 256));
+            __m512i y10 = _mm512_mulhi_epu16(_mm512_unpacklo_epi8(__m512i(), y10lh), _mm512_set1_epi16(Y * 256));
+            __m512i y11 = _mm512_mulhi_epu16(_mm512_unpackhi_epi8(__m512i(), y10lh), _mm512_set1_epi16(Y * 256));
+#else
+            __m512i y00lh = _mm512_load_si512((__m512i*)y0);   y0 += 64;
+            __m512i y10lh = _mm512_load_si512((__m512i*)y1);   y1 += 64;
+            __m512i y00 = _mm512_unpacklo_epi8(y00lh, __m512i());
+            __m512i y01 = _mm512_unpackhi_epi8(y00lh, __m512i());
+            __m512i y10 = _mm512_unpacklo_epi8(y10lh, __m512i());
+            __m512i y11 = _mm512_unpackhi_epi8(y10lh, __m512i());
+#endif
+
+            __m512i u00;
+            __m512i v00;
+            if (interleaved)
+            {
+                if (firstV)
+                {
+                    __m512i uv00 = _mm512_loadu_si512((__m512i*)v0);   v0 += 64;
+                    u00 = _mm512_add_epi16(_mm512_and_si512(uv00, _mm512_set1_epi16(0xFF00)), _mm512_set1_epi16(-32768));
+                    v00 = _mm512_add_epi16(_mm512_slli_epi16(uv00, 8), _mm512_set1_epi16(-32768));
+                }
+                else
+                {
+                    __m512i uv00 = _mm512_loadu_si512((__m512i*)u0);   u0 += 64;
+                    u00 = _mm512_add_epi16(_mm512_slli_epi16(uv00, 8), _mm512_set1_epi16(-32768));
+                    v00 = _mm512_add_epi16(_mm512_and_si512(uv00, _mm512_set1_epi16(0xFF00)), _mm512_set1_epi16(-32768));
+                }
+            }
+            else
+            {
+                u00 = _mm512_add_epi16(_mm512_slli_epi16(_mm512_cvtepu8_epi16(_mm256_load_si256((__m256i*)u0)), 8), _mm512_set1_epi16(-32768));  u0 += 32;
+                v00 = _mm512_add_epi16(_mm512_slli_epi16(_mm512_cvtepu8_epi16(_mm256_load_si256((__m256i*)v0)), 8), _mm512_set1_epi16(-32768));  v0 += 32;
+            }
+
+            __m512i dR =                                                                        _mm512_mulhi_epi16(v00, _mm512_set1_epi16(VR * 256));
+            __m512i dG = _mm512_add_epi16(_mm512_mulhi_epi16(u00, _mm512_set1_epi16(UG * 256)), _mm512_mulhi_epi16(v00, _mm512_set1_epi16(VG * 256)));
+            __m512i dB =                  _mm512_mulhi_epi16(u00, _mm512_set1_epi16(UB * 256));
+
+            __m512i xR[2] = { _mm512_unpacklo_epi16(dR, dR), _mm512_unpackhi_epi16(dR, dR) };
+            __m512i xG[2] = { _mm512_unpacklo_epi16(dG, dG), _mm512_unpackhi_epi16(dG, dG) };
+            __m512i xB[2] = { _mm512_unpacklo_epi16(dB, dB), _mm512_unpackhi_epi16(dB, dB) };
+
+            __m512i t[4];
+            __m512i b[4];
+
+            t[iR] = _mm512_packus_epi16(_mm512_add_epi16(y00, xR[0]), _mm512_add_epi16(y01, xR[1]));
+            t[iG] = _mm512_packus_epi16(_mm512_add_epi16(y00, xG[0]), _mm512_add_epi16(y01, xG[1]));
+            t[iB] = _mm512_packus_epi16(_mm512_add_epi16(y00, xB[0]), _mm512_add_epi16(y01, xB[1]));
+            t[iA] = _mm512_set1_epi8(-1);
+            b[iR] = _mm512_packus_epi16(_mm512_add_epi16(y10, xR[0]), _mm512_add_epi16(y11, xR[1]));
+            b[iG] = _mm512_packus_epi16(_mm512_add_epi16(y10, xG[0]), _mm512_add_epi16(y11, xG[1]));
+            b[iB] = _mm512_packus_epi16(_mm512_add_epi16(y10, xB[0]), _mm512_add_epi16(y11, xB[1]));
+            b[iA] = _mm512_set1_epi8(-1);
+
+            _MM512_TRANSPOSE4_EPI8(t[0], t[1], t[2], t[3]);
+            _MM512_TRANSPOSE4_EPI8(b[0], b[1], b[2], b[3]);
+
+            _mm512_mask_storeu_epi32((__m128i*)rgb0 +  0, 0x000F, t[0]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb0 +  1, 0x00F0, t[0]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb0 +  2, 0x0F00, t[0]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb0 +  3, 0xF000, t[0]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb0 +  4, 0x000F, t[1]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb0 +  5, 0x00F0, t[1]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb0 +  6, 0x0F00, t[1]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb0 +  7, 0xF000, t[1]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb0 +  8, 0x000F, t[2]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb0 +  9, 0x00F0, t[2]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb0 + 10, 0x0F00, t[2]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb0 + 11, 0xF000, t[2]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb0 + 12, 0x000F, t[3]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb0 + 13, 0x00F0, t[3]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb0 + 14, 0x0F00, t[3]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb0 + 15, 0xF000, t[3]);    rgb0 += 16 * 16;
+            _mm512_mask_storeu_epi32((__m128i*)rgb1 +  0, 0x000F, b[0]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb1 +  1, 0x00F0, b[0]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb1 +  2, 0x0F00, b[0]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb1 +  3, 0xF000, b[0]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb1 +  4, 0x000F, b[1]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb1 +  5, 0x00F0, b[1]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb1 +  6, 0x0F00, b[1]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb1 +  7, 0xF000, b[1]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb1 +  8, 0x000F, b[2]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb1 +  9, 0x00F0, b[2]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb1 + 10, 0x0F00, b[2]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb1 + 11, 0xF000, b[2]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb1 + 12, 0x000F, b[3]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb1 + 13, 0x00F0, b[3]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb1 + 14, 0x0F00, b[3]);
+            _mm512_mask_storeu_epi32((__m128i*)rgb1 + 15, 0xF000, b[3]);    rgb1 += 16 * 16;
+        }
+        if (rgbWidth == 4)
+            continue;
+#elif defined(__AVX2__)
         int halfWidth16 = (rgbWidth == 4) ? halfWidth / 16 : 0;
         for (int w = 0; w < halfWidth16; ++w)
         {
 #if VIDEO_RANGE
             __m256i y00lh = _mm256_subs_epu8(_mm256_loadu_si256((__m256i*)y0), _mm256_set1_epi8(16));   y0 += 32;
             __m256i y10lh = _mm256_subs_epu8(_mm256_loadu_si256((__m256i*)y1), _mm256_set1_epi8(16));   y1 += 32;
-            __m256i y00 = _mm256_srai_epi16(_mm256_mullo_epi16(_mm256_unpacklo_epi8(y00lh, __m256i()), _mm256_set1_epi16(Y * 128)), 7);
-            __m256i y01 = _mm256_srai_epi16(_mm256_mullo_epi16(_mm256_unpackhi_epi8(y00lh, __m256i()), _mm256_set1_epi16(Y * 128)), 7);
-            __m256i y10 = _mm256_srai_epi16(_mm256_mullo_epi16(_mm256_unpacklo_epi8(y10lh, __m256i()), _mm256_set1_epi16(Y * 128)), 7);
-            __m256i y11 = _mm256_srai_epi16(_mm256_mullo_epi16(_mm256_unpackhi_epi8(y10lh, __m256i()), _mm256_set1_epi16(Y * 128)), 7);
+            __m256i y00 = _mm256_mulhi_epu16(_mm256_unpacklo_epi8(__m256i(), y00lh), _mm256_set1_epi16(Y * 256));
+            __m256i y01 = _mm256_mulhi_epu16(_mm256_unpackhi_epi8(__m256i(), y00lh), _mm256_set1_epi16(Y * 256));
+            __m256i y10 = _mm256_mulhi_epu16(_mm256_unpacklo_epi8(__m256i(), y10lh), _mm256_set1_epi16(Y * 256));
+            __m256i y11 = _mm256_mulhi_epu16(_mm256_unpackhi_epi8(__m256i(), y10lh), _mm256_set1_epi16(Y * 256));
 #else
             __m256i y00lh = _mm256_load_si256((__m256i*)y0);   y0 += 32;
             __m256i y10lh = _mm256_load_si256((__m256i*)y1);   y1 += 32;
@@ -245,17 +357,17 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
         }
         if (rgbWidth == 4)
             continue;
-#endif
+#elif defined(_M_IX86) || defined(_M_AMD64) || defined(__i386__) || defined(__amd64__)
         int halfWidth8 = (rgbWidth == 4) ? halfWidth / 8 : 0;
         for (int w = 0; w < halfWidth8; ++w)
         {
 #if VIDEO_RANGE
             __m128i y00lh = _mm_subs_epu8(_mm_loadu_si128((__m128i*)y0), _mm_set1_epi8(16));    y0 += 16;
             __m128i y10lh = _mm_subs_epu8(_mm_loadu_si128((__m128i*)y1), _mm_set1_epi8(16));    y1 += 16;
-            __m128i y00 = _mm_srai_epi16(_mm_mullo_epi16(_mm_unpacklo_epi8(y00lh, __m128i()), _mm_set1_epi16(Y * 128)), 7);
-            __m128i y01 = _mm_srai_epi16(_mm_mullo_epi16(_mm_unpackhi_epi8(y00lh, __m128i()), _mm_set1_epi16(Y * 128)), 7);
-            __m128i y10 = _mm_srai_epi16(_mm_mullo_epi16(_mm_unpacklo_epi8(y10lh, __m128i()), _mm_set1_epi16(Y * 128)), 7);
-            __m128i y11 = _mm_srai_epi16(_mm_mullo_epi16(_mm_unpackhi_epi8(y10lh, __m128i()), _mm_set1_epi16(Y * 128)), 7);
+            __m128i y00 = _mm_mulhi_epu16(_mm_unpacklo_epi8(__m128i(), y00lh), _mm_set1_epi16(Y * 256));
+            __m128i y01 = _mm_mulhi_epu16(_mm_unpackhi_epi8(__m128i(), y00lh), _mm_set1_epi16(Y * 256));
+            __m128i y10 = _mm_mulhi_epu16(_mm_unpacklo_epi8(__m128i(), y10lh), _mm_set1_epi16(Y * 256));
+            __m128i y11 = _mm_mulhi_epu16(_mm_unpackhi_epi8(__m128i(), y10lh), _mm_set1_epi16(Y * 256));
 #else
             __m128i y00lh = _mm_loadu_si128((__m128i*)y0);  y0 += 16;
             __m128i y10lh = _mm_loadu_si128((__m128i*)y1);  y1 += 16;
