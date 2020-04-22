@@ -20,30 +20,27 @@
 // Y =  0.18275  0.61477  0.06200
 // U = -0.10072 -0.33882  0.43931
 // V =  0.43867 -0.40048 -0.04038
-#if VIDEO_RANGE
-#define RY  0.21260
-#define GY  0.71520
-#define BY  0.07220
-#define RU -0.11412
-#define GU -0.38392
-#define BU  0.49804
-#define RV  0.49804
-#define GV -0.45237
-#define BV -0.04567
-#else
-#define RY  0.18275
-#define GY  0.61477
-#define BY  0.06200
-#define RU -0.10072
-#define GU -0.33882
-#define BU  0.43931
-#define RV  0.43867
-#define GV -0.40048
-#define BV -0.04038
-#endif
+#define vRY  0.21260
+#define vGY  0.71520
+#define vBY  0.07220
+#define vRU -0.11412
+#define vGU -0.38392
+#define vBU  0.49804
+#define vRV  0.49804
+#define vGV -0.45237
+#define vBV -0.04567
+#define fRY  0.18275
+#define fGY  0.61477
+#define fBY  0.06200
+#define fRU -0.10072
+#define fGU -0.33882
+#define fBU  0.43931
+#define fRV  0.43867
+#define fGV -0.40048
+#define fBV -0.04038
 
 //------------------------------------------------------------------------------
-template<int rgbWidth, bool rgbSwizzle, bool interleaved, bool firstV>
+template<int rgbWidth, bool rgbSwizzle, bool interleaved, bool firstU, bool fullRange>
 void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, void* u, void* v, int strideY, int strideU, int strideV)
 {
     int halfWidth = width >> 1;
@@ -53,6 +50,20 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
     int iG = 1;
     int iB = rgbSwizzle ? 0 : 2;
     int iA = 3;
+
+    int RY, RU, RV, GY, GU, GV, BY, BU, BV;
+    if (fullRange)
+    {
+        RY = (int)(fRY * 256); RU = (int)(fRU * 256); RV = (int)(fRV * 256);
+        GY = (int)(fGY * 256); GU = (int)(fGU * 256); GV = (int)(fGV * 256);
+        BY = (int)(fBY * 256); BU = (int)(fBU * 256); BV = (int)(fBV * 256);
+    }
+    else
+    {
+        RY = (int)(vRY * 256); RU = (int)(vRU * 256); RV = (int)(vRV * 256);
+        GY = (int)(vGY * 256); GU = (int)(vGU * 256); GV = (int)(vGV * 256);
+        BY = (int)(vBY * 256); BU = (int)(vBU * 256); BV = (int)(vBV * 256);
+    }
 
     for (int h = 0; h < halfHeight; ++h)
     {
@@ -85,31 +96,34 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
             int g000 = (g00 + g01 + g10 + g11) / 4;
             int b000 = (b00 + b01 + b10 + b11) / 4;
 
-            int y00 = r00 * (int)(RY * 128) + g00 * (int)(GY * 128) + b00 * (int)(BY * 128);
-            int y01 = r01 * (int)(RY * 128) + g01 * (int)(GY * 128) + b01 * (int)(BY * 128);
-            int y10 = r10 * (int)(RY * 128) + g10 * (int)(GY * 128) + b10 * (int)(BY * 128);
-            int y11 = r11 * (int)(RY * 128) + g11 * (int)(GY * 128) + b11 * (int)(BY * 128);
-            int u00 = r000 * (int)(RU * 128) + g000 * (int)(GU * 128) + b000 * (int)(BU * 128);
-            int v00 = r000 * (int)(RV * 128) + g000 * (int)(GV * 128) + b000 * (int)(BV * 128);
+            int y00 = r00  * RY + g00  * GY + b00  * BY;
+            int y01 = r01  * RY + g01  * GY + b01  * BY;
+            int y10 = r10  * RY + g10  * GY + b10  * BY;
+            int y11 = r11  * RY + g11  * GY + b11  * BY;
+            int u00 = r000 * RU + g000 * GU + b000 * BU;
+            int v00 = r000 * RV + g000 * GV + b000 * BV;
 
             auto clamp = [](int value) -> unsigned char
             {
                 return (unsigned char)(value < 255 ? value < 0 ? 0 : value : 255);
             };
 
-#if VIDEO_RANGE
-            (*y0++) = clamp(y00 >> 7);
-            (*y0++) = clamp(y01 >> 7);
-            (*y1++) = clamp(y10 >> 7);
-            (*y1++) = clamp(y11 >> 7);
-#else
-            (*y0++) = clamp((y00 >> 7) + 16);
-            (*y0++) = clamp((y01 >> 7) + 16);
-            (*y1++) = clamp((y10 >> 7) + 16);
-            (*y1++) = clamp((y11 >> 7) + 16);
-#endif
-            (*u0++) = clamp((u00 >> 7) + 128);
-            (*v0++) = clamp((v00 >> 7) + 128);
+            if (fullRange)
+            {
+                (*y0++) = clamp((y00 >> 8) + 16);
+                (*y0++) = clamp((y01 >> 8) + 16);
+                (*y1++) = clamp((y10 >> 8) + 16);
+                (*y1++) = clamp((y11 >> 8) + 16);
+            }
+            else
+            {
+                (*y0++) = clamp(y00 >> 8);
+                (*y0++) = clamp(y01 >> 8);
+                (*y1++) = clamp(y10 >> 8);
+                (*y1++) = clamp(y11 >> 8);
+            }
+            (*u0++) = clamp((u00 >> 8) + 128);
+            (*v0++) = clamp((v00 >> 8) + 128);
             if (interleaved)
             {
                 u0++;
@@ -119,7 +133,7 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
     }
 }
 //------------------------------------------------------------------------------
-void rgb2yuv_yu12(int width, int height, const void* rgb, void* yuv, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
+void rgb2yuv_yu12(int width, int height, const void* rgb, void* yuv, bool fullRange, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
 {
     int sizeY = align(width, alignWidth) * align(height, alignHeight);
     int sizeUV = align(width / 2, alignWidth) * align(height / 2, alignHeight);
@@ -127,23 +141,47 @@ void rgb2yuv_yu12(int width, int height, const void* rgb, void* yuv, int rgbWidt
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
 
-    if (rgbSwizzle)
+    auto converter = rgb2yuv<3, false, false, false, false>;
+
+    if (rgbWidth == 3)
     {
-        if (rgbWidth == 3)
-            rgb2yuv<3, true, false, false>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2);
-        else if (rgbWidth == 4)
-            rgb2yuv<4, true, false, false>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2);
+        if (rgbSwizzle)
+        {
+            if (fullRange)
+                converter = rgb2yuv<3, true, false, false, true>;
+            else
+                converter = rgb2yuv<3, true, false, false, false>;
+        }
+        else
+        {
+            if (fullRange)
+                converter = rgb2yuv<3, false, false, false, true>;
+            else
+                converter = rgb2yuv<3, false, false, false, false>;
+        }
     }
-    else
+    else if (rgbWidth == 4)
     {
-        if (rgbWidth == 3)
-            rgb2yuv<3, false, false, false>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2);
-        else if (rgbWidth == 4)
-            rgb2yuv<4, false, false, false>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2);
+        if (rgbSwizzle)
+        {
+            if (fullRange)
+                converter = rgb2yuv<4, true, false, false, true>;
+            else
+                converter = rgb2yuv<4, true, false, false, false>;
+        }
+        else
+        {
+            if (fullRange)
+                converter = rgb2yuv<4, false, false, false, true>;
+            else
+                converter = rgb2yuv<4, false, false, false, false>;
+        }
     }
+
+    converter(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2);
 }
 //------------------------------------------------------------------------------
-void rgb2yuv_yv12(int width, int height, const void* rgb, void* yuv, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
+void rgb2yuv_yv12(int width, int height, const void* rgb, void* yuv, bool fullRange, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
 {
     int sizeY = align(width, alignWidth) * align(height, alignHeight);
     int sizeUV = align(width / 2, alignWidth) * align(height / 2, alignHeight);
@@ -151,65 +189,137 @@ void rgb2yuv_yv12(int width, int height, const void* rgb, void* yuv, int rgbWidt
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
 
-    if (rgbSwizzle)
+    auto converter = rgb2yuv<3, false, false, false, false>;
+
+    if (rgbWidth == 3)
     {
-        if (rgbWidth == 3)
-            rgb2yuv<3, true, false, true>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2);
-        else if (rgbWidth == 4)
-            rgb2yuv<4, true, false, true>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2);
+        if (rgbSwizzle)
+        {
+            if (fullRange)
+                converter = rgb2yuv<3, true, false, false, true>;
+            else
+                converter = rgb2yuv<3, true, false, false, false>;
+        }
+        else
+        {
+            if (fullRange)
+                converter = rgb2yuv<3, false, false, false, true>;
+            else
+                converter = rgb2yuv<3, false, false, false, false>;
+        }
     }
-    else
+    else if (rgbWidth == 4)
     {
-        if (rgbWidth == 3)
-            rgb2yuv<3, false, false, true>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2);
-        else if (rgbWidth == 4)
-            rgb2yuv<4, false, false, true>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2);
+        if (rgbSwizzle)
+        {
+            if (fullRange)
+                converter = rgb2yuv<4, true, false, false, true>;
+            else
+                converter = rgb2yuv<4, true, false, false, false>;
+        }
+        else
+        {
+            if (fullRange)
+                converter = rgb2yuv<4, false, false, false, true>;
+            else
+                converter = rgb2yuv<4, false, false, false, false>;
+        }
     }
+
+    converter(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2);
 }
 //------------------------------------------------------------------------------
-void rgb2yuv_nv12(int width, int height, const void* rgb, void* yuv, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
+void rgb2yuv_nv12(int width, int height, const void* rgb, void* yuv, bool fullRange, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
 {
     int sizeY = align(width, alignWidth) * align(height, alignHeight);
 
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
 
-    if (rgbSwizzle)
+    auto converter = rgb2yuv<3, false, false, false, false>;
+
+    if (rgbWidth == 3)
     {
-        if (rgbWidth == 3)
-            rgb2yuv<3, true, true, false>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width);
-        else if (rgbWidth == 4)
-            rgb2yuv<4, true, true, false>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width);
+        if (rgbSwizzle)
+        {
+            if (fullRange)
+                converter = rgb2yuv<3, true, true, true, true>;
+            else
+                converter = rgb2yuv<3, true, true, true, false>;
+        }
+        else
+        {
+            if (fullRange)
+                converter = rgb2yuv<3, false, true, true, true>;
+            else
+                converter = rgb2yuv<3, false, true, true, false>;
+        }
     }
-    else
+    else if (rgbWidth == 4)
     {
-        if (rgbWidth == 3)
-            rgb2yuv<3, false, true, false>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width);
-        else if (rgbWidth == 4)
-            rgb2yuv<4, false, true, false>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width);
+        if (rgbSwizzle)
+        {
+            if (fullRange)
+                converter = rgb2yuv<4, true, true, true, true>;
+            else
+                converter = rgb2yuv<4, true, true, true, false>;
+        }
+        else
+        {
+            if (fullRange)
+                converter = rgb2yuv<4, false, true, true, true>;
+            else
+                converter = rgb2yuv<4, false, true, true, false>;
+        }
     }
+
+    converter(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width);
 }
 //------------------------------------------------------------------------------
-void rgb2yuv_nv21(int width, int height, const void* rgb, void* yuv, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
+void rgb2yuv_nv21(int width, int height, const void* rgb, void* yuv, bool fullRange, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
 {
     int sizeY = align(width, alignWidth) * align(height, alignHeight);
 
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
 
-    if (rgbSwizzle)
+    auto converter = rgb2yuv<3, false, false, false, false>;
+
+    if (rgbWidth == 3)
     {
-        if (rgbWidth == 3)
-            rgb2yuv<3, true, true, true>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width);
-        else if (rgbWidth == 4)
-            rgb2yuv<4, true, true, true>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width);
+        if (rgbSwizzle)
+        {
+            if (fullRange)
+                converter = rgb2yuv<3, true, true, false, true>;
+            else
+                converter = rgb2yuv<3, true, true, false, false>;
+        }
+        else
+        {
+            if (fullRange)
+                converter = rgb2yuv<3, false, true, false, true>;
+            else
+                converter = rgb2yuv<3, false, true, false, false>;
+        }
     }
-    else
+    else if (rgbWidth == 4)
     {
-        if (rgbWidth == 3)
-            rgb2yuv<3, false, true, true>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width);
-        else if (rgbWidth == 4)
-            rgb2yuv<4, false, true, true>(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width);
+        if (rgbSwizzle)
+        {
+            if (fullRange)
+                converter = rgb2yuv<4, true, true, false, true>;
+            else
+                converter = rgb2yuv<4, true, true, false, false>;
+        }
+        else
+        {
+            if (fullRange)
+                converter = rgb2yuv<4, false, true, false, true>;
+            else
+                converter = rgb2yuv<4, false, true, false, false>;
+        }
     }
+
+    converter(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width);
 }
 //------------------------------------------------------------------------------

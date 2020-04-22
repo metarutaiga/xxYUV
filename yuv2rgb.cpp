@@ -49,7 +49,6 @@
 #endif
 #include "yuv2rgb.h"
 
-#define VIDEO_RANGE 1
 #define align(v, a) ((v) + ((a) - 1) & ~((a) - 1))
 
 // BT.709 - Video Range
@@ -63,22 +62,19 @@
 // R = 1.000000  0.000000  1.581000
 // G = 1.000000 -0.188062 -0.469967
 // B = 1.000000  1.862906  0.000000
-#if VIDEO_RANGE
-#define Y   1.164384
-#define UG -0.213249
-#define UB  2.112402
-#define VR  1.792741
-#define VG -0.532909
-#else
-#define Y   1.000000
-#define UG -0.188062
-#define UB  1.862906
-#define VR  1.581000
-#define VG -0.469967
-#endif
+#define vY   1.164384
+#define vUG -0.213249
+#define vUB  2.112402
+#define vVR  1.792741
+#define vVG -0.532909
+#define fY   1.000000
+#define fUG -0.188062
+#define fUB  1.862906
+#define fVR  1.581000
+#define fVG -0.469967
 
 //------------------------------------------------------------------------------
-template<int rgbWidth, bool rgbSwizzle, bool interleaved, bool firstV>
+template<int rgbWidth, bool rgbSwizzle, bool interleaved, bool firstU, bool fullRange>
 void yuv2rgb(int width, int height, const void* y, const void* u, const void* v, int strideY, int strideU, int strideV, void* rgb, int strideRGB)
 {
     int halfWidth = width >> 1;
@@ -88,6 +84,20 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
     int iG = 1;
     int iB = rgbSwizzle ? 0 : 2;
     int iA = 3;
+
+    int Y, UG, UB, VR, VG;
+    if (fullRange)
+    {
+        Y = (int)(fY * 256);
+        UG = (int)(fUG * 256); UB = (int)(fUB * 256);
+        VR = (int)(fVR * 256); VG = (int)(fVG * 256);
+    }
+    else
+    {
+        Y = (int)(vY * 256);
+        UG = (int)(vUG * 256); UB = (int)(vUB * 256);
+        VR = (int)(vVR * 256); VG = (int)(vVG * 256);
+    }
 
     for (int h = 0; h < halfHeight; ++h)
     {
@@ -101,39 +111,42 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
         int halfWidth8 = (rgbWidth == 4) ? halfWidth / 8 : 0;
         for (int w = 0; w < halfWidth8; ++w)
         {
-#if VIDEO_RANGE
-            uint8x16_t y00lh = vqsubq_u8(vld1q_u8(y0), vdupq_n_u8(16)); y0 += 16;
-            uint8x16_t y10lh = vqsubq_u8(vld1q_u8(y1), vdupq_n_u8(16)); y1 += 16;
-            uint8x8_t y00 = vshrn_n_u16(vmull_u8(vget_low_u8(y00lh), vdup_n_u8(Y * 128)), 7);
-            uint8x8_t y01 = vshrn_n_u16(vmull_u8(vget_high_u8(y00lh), vdup_n_u8(Y * 128)), 7);
-            uint8x8_t y10 = vshrn_n_u16(vmull_u8(vget_low_u8(y10lh), vdup_n_u8(Y * 128)), 7);
-            uint8x8_t y11 = vshrn_n_u16(vmull_u8(vget_high_u8(y10lh), vdup_n_u8(Y * 128)), 7);
-#else
             uint8x16_t y00lh = vld1q_u8(y0); y0 += 16;
             uint8x16_t y10lh = vld1q_u8(y1); y1 += 16;
             uint8x8_t y00 = vget_low_u8(y00lh);
             uint8x8_t y01 = vget_high_u8(y00lh);
             uint8x8_t y10 = vget_low_u8(y10lh);
             uint8x8_t y11 = vget_high_u8(y10lh);
-#endif
+            if (fullRange)
+            {
+            }
+            else
+            {
+                y00lh = vqsubq_u8(y00lh, vdupq_n_u8(16));
+                y10lh = vqsubq_u8(y10lh, vdupq_n_u8(16));
+                y00 = vshrn_n_u16(vmull_u8(vget_low_u8(y00lh), vdup_n_u8(Y / 2)), 7);
+                y01 = vshrn_n_u16(vmull_u8(vget_high_u8(y00lh), vdup_n_u8(Y / 2)), 7);
+                y10 = vshrn_n_u16(vmull_u8(vget_low_u8(y10lh), vdup_n_u8(Y / 2)), 7);
+                y11 = vshrn_n_u16(vmull_u8(vget_high_u8(y10lh), vdup_n_u8(Y / 2)), 7);
+            }
 
             int8x8_t u000;
             int8x8_t v000;
             if (interleaved)
             {
-                if (firstV)
+                if (firstU)
                 {
-                    int8x16_t uv00 = vld1q_u8(v0); v0 += 16;
+                    int8x16_t uv00 = vld1q_u8(u0); u0 += 16;
                     int8x8x2_t uv00lh = vuzp_s8(vget_low_s8(uv00), vget_high_s8(uv00));
-                    int8x16_t uv000 = vaddq_s8(vcombine_s8(uv00lh.val[1], uv00lh.val[0]), vdupq_n_s8(-128));
+                    int8x16_t uv000 = vaddq_s8(vcombine_s8(uv00lh.val[0], uv00lh.val[1]), vdupq_n_s8(-128));
                     u000 = vget_low_s8(uv000);
                     v000 = vget_high_s8(uv000);
                 }
                 else
                 {
-                    int8x16_t uv00 = vld1q_u8(u0); u0 += 16;
+                    int8x16_t uv00 = vld1q_u8(v0); v0 += 16;
                     int8x8x2_t uv00lh = vuzp_s8(vget_low_s8(uv00), vget_high_s8(uv00));
-                    int8x16_t uv000 = vaddq_s8(vcombine_s8(uv00lh.val[0], uv00lh.val[1]), vdupq_n_s8(-128));
+                    int8x16_t uv000 = vaddq_s8(vcombine_s8(uv00lh.val[1], uv00lh.val[0]), vdupq_n_s8(-128));
                     u000 = vget_low_s8(uv000);
                     v000 = vget_high_s8(uv000);
                 }
@@ -146,16 +159,16 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
             }
 
 #if NEON_FAST
-            int16x8_t dR = vshrq_n_s16(                                     vmull_s8(v000, vdup_n_s8(VR *  64)), 6);
-            int16x8_t dG = vshrq_n_s16(vmlal_s8(vmull_s8(u000, vdup_n_s8(UG * 128)), v000, vdup_n_s8(VG * 128)), 7);
-            int16x8_t dB = vshrq_n_s16(         vmull_s8(u000, vdup_n_s8(UB *  32)),                             5);
+            int16x8_t dR = vshrq_n_s16(                                   vmull_s8(v000, vdup_n_s8(VR / 4)), 6);
+            int16x8_t dG = vshrq_n_s16(vmlal_s8(vmull_s8(u000, vdup_n_s8(UG / 2)), v000, vdup_n_s8(VG / 2)), 7);
+            int16x8_t dB = vshrq_n_s16(         vmull_s8(u000, vdup_n_s8(UB / 8)),                           5);
 #else
-            int16x8_t u00 = vmovl_s8(u000);
-            int16x8_t v00 = vmovl_s8(v000);
+            int16x8_t u00 = vshll_n_s8(u000, 7);
+            int16x8_t v00 = vshll_n_s8(v000, 7);
 
-            int16x8_t dR = vshrq_n_s16(                            vmulq_n_s16(v00, VR * 128), 7);
-            int16x8_t dG = vshrq_n_s16(vmlaq_n_s16(vmulq_n_s16(u00, UG * 256), v00, VG * 256), 8);
-            int16x8_t dB = vshrq_n_s16(            vmulq_n_s16(u00, UB *  64),                 6);
+            int16x8_t dR =                                               vqdmulhq_s16(v00, vdupq_n_s16(VR));
+            int16x8_t dG = vaddq_s16(vqdmulhq_s16(u00, vdupq_n_s16(UG)), vqdmulhq_s16(v00, vdupq_n_s16(VG)));
+            int16x8_t dB =           vqdmulhq_s16(u00, vdupq_n_s16(UB));
 #endif
 
             uint16x8x2_t xR = vzipq_u16(vreinterpretq_u16_s16(dR), vreinterpretq_u16_s16(dR));
@@ -183,48 +196,55 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
         int halfWidth16 = (rgbWidth == 4) ? halfWidth / 32 : 0;
         for (int w = 0; w < halfWidth16; ++w)
         {
-#if VIDEO_RANGE
-            __m512i y00lh = _mm512_subs_epu8(_mm512_loadu_si512((__m512i*)y0), _mm512_set1_epi8(16));   y0 += 64;
-            __m512i y10lh = _mm512_subs_epu8(_mm512_loadu_si512((__m512i*)y1), _mm512_set1_epi8(16));   y1 += 64;
-            __m512i y00 = _mm512_mulhi_epu16(_mm512_unpacklo_epi8(__m512i(), y00lh), _mm512_set1_epi16(Y * 256));
-            __m512i y01 = _mm512_mulhi_epu16(_mm512_unpackhi_epi8(__m512i(), y00lh), _mm512_set1_epi16(Y * 256));
-            __m512i y10 = _mm512_mulhi_epu16(_mm512_unpacklo_epi8(__m512i(), y10lh), _mm512_set1_epi16(Y * 256));
-            __m512i y11 = _mm512_mulhi_epu16(_mm512_unpackhi_epi8(__m512i(), y10lh), _mm512_set1_epi16(Y * 256));
-#else
-            __m512i y00lh = _mm512_load_si512((__m512i*)y0);   y0 += 64;
-            __m512i y10lh = _mm512_load_si512((__m512i*)y1);   y1 += 64;
-            __m512i y00 = _mm512_unpacklo_epi8(y00lh, __m512i());
-            __m512i y01 = _mm512_unpackhi_epi8(y00lh, __m512i());
-            __m512i y10 = _mm512_unpacklo_epi8(y10lh, __m512i());
-            __m512i y11 = _mm512_unpackhi_epi8(y10lh, __m512i());
-#endif
+            __m512i y00lh = _mm512_load_si512((__m512i*)y0); y0 += 64;
+            __m512i y10lh = _mm512_load_si512((__m512i*)y1); y1 += 64;
+            __m512i y00;
+            __m512i y01;
+            __m512i y10;
+            __m512i y11;
+            if (fullRange)
+            {
+                y00 = _mm512_unpacklo_epi8(y00lh, __m512i());
+                y01 = _mm512_unpackhi_epi8(y00lh, __m512i());
+                y10 = _mm512_unpacklo_epi8(y10lh, __m512i());
+                y11 = _mm512_unpackhi_epi8(y10lh, __m512i());
+            }
+            else
+            {
+                y00lh = _mm512_subs_epu8(y00lh, _mm512_set1_epi8(16));
+                y10lh = _mm512_subs_epu8(y10lh, _mm512_set1_epi8(16));
+                y00 = _mm512_mulhi_epu16(_mm512_unpacklo_epi8(__m512i(), y00lh), _mm512_set1_epi16(Y));
+                y01 = _mm512_mulhi_epu16(_mm512_unpackhi_epi8(__m512i(), y00lh), _mm512_set1_epi16(Y));
+                y10 = _mm512_mulhi_epu16(_mm512_unpacklo_epi8(__m512i(), y10lh), _mm512_set1_epi16(Y));
+                y11 = _mm512_mulhi_epu16(_mm512_unpackhi_epi8(__m512i(), y10lh), _mm512_set1_epi16(Y));
+            }
 
             __m512i u00;
             __m512i v00;
             if (interleaved)
             {
-                if (firstV)
+                if (firstU)
                 {
-                    __m512i uv00 = _mm512_loadu_si512((__m512i*)v0);   v0 += 64;
-                    u00 = _mm512_add_epi16(_mm512_and_si512(uv00, _mm512_set1_epi16(0xFF00)), _mm512_set1_epi16(-32768));
-                    v00 = _mm512_add_epi16(_mm512_slli_epi16(uv00, 8), _mm512_set1_epi16(-32768));
+                    __m512i uv00 = _mm512_loadu_si512((__m512i*)u0); u0 += 64;
+                    u00 = _mm512_add_epi16(_mm512_slli_epi16(uv00, 8), _mm512_set1_epi16(-32768));
+                    v00 = _mm512_add_epi16(_mm512_and_si512(uv00, _mm512_set1_epi16(0xFF00)), _mm512_set1_epi16(-32768));
                 }
                 else
                 {
-                    __m512i uv00 = _mm512_loadu_si512((__m512i*)u0);   u0 += 64;
-                    u00 = _mm512_add_epi16(_mm512_slli_epi16(uv00, 8), _mm512_set1_epi16(-32768));
-                    v00 = _mm512_add_epi16(_mm512_and_si512(uv00, _mm512_set1_epi16(0xFF00)), _mm512_set1_epi16(-32768));
+                    __m512i uv00 = _mm512_loadu_si512((__m512i*)v0); v0 += 64;
+                    u00 = _mm512_add_epi16(_mm512_and_si512(uv00, _mm512_set1_epi16(0xFF00)), _mm512_set1_epi16(-32768));
+                    v00 = _mm512_add_epi16(_mm512_slli_epi16(uv00, 8), _mm512_set1_epi16(-32768));
                 }
             }
             else
             {
-                u00 = _mm512_add_epi16(_mm512_slli_epi16(_mm512_cvtepu8_epi16(_mm256_load_si256((__m256i*)u0)), 8), _mm512_set1_epi16(-32768));  u0 += 32;
-                v00 = _mm512_add_epi16(_mm512_slli_epi16(_mm512_cvtepu8_epi16(_mm256_load_si256((__m256i*)v0)), 8), _mm512_set1_epi16(-32768));  v0 += 32;
+                u00 = _mm512_add_epi16(_mm512_slli_epi16(_mm512_cvtepu8_epi16(_mm256_load_si256((__m256i*)u0)), 8), _mm512_set1_epi16(-32768)); u0 += 32;
+                v00 = _mm512_add_epi16(_mm512_slli_epi16(_mm512_cvtepu8_epi16(_mm256_load_si256((__m256i*)v0)), 8), _mm512_set1_epi16(-32768)); v0 += 32;
             }
 
-            __m512i dR =                                                                        _mm512_mulhi_epi16(v00, _mm512_set1_epi16(VR * 256));
-            __m512i dG = _mm512_add_epi16(_mm512_mulhi_epi16(u00, _mm512_set1_epi16(UG * 256)), _mm512_mulhi_epi16(v00, _mm512_set1_epi16(VG * 256)));
-            __m512i dB =                  _mm512_mulhi_epi16(u00, _mm512_set1_epi16(UB * 256));
+            __m512i dR =                                                                  _mm512_mulhi_epi16(v00, _mm512_set1_epi16(VR));
+            __m512i dG = _mm512_add_epi16(_mm512_mulhi_epi16(u00, _mm512_set1_epi16(UG)), _mm512_mulhi_epi16(v00, _mm512_set1_epi16(VG)));
+            __m512i dB =                  _mm512_mulhi_epi16(u00, _mm512_set1_epi16(UB));
 
             __m512i xR[2] = { _mm512_unpacklo_epi16(dR, dR), _mm512_unpackhi_epi16(dR, dR) };
             __m512i xG[2] = { _mm512_unpacklo_epi16(dG, dG), _mm512_unpackhi_epi16(dG, dG) };
@@ -284,48 +304,55 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
         int halfWidth16 = (rgbWidth == 4) ? halfWidth / 16 : 0;
         for (int w = 0; w < halfWidth16; ++w)
         {
-#if VIDEO_RANGE
-            __m256i y00lh = _mm256_subs_epu8(_mm256_loadu_si256((__m256i*)y0), _mm256_set1_epi8(16));   y0 += 32;
-            __m256i y10lh = _mm256_subs_epu8(_mm256_loadu_si256((__m256i*)y1), _mm256_set1_epi8(16));   y1 += 32;
-            __m256i y00 = _mm256_mulhi_epu16(_mm256_unpacklo_epi8(__m256i(), y00lh), _mm256_set1_epi16(Y * 256));
-            __m256i y01 = _mm256_mulhi_epu16(_mm256_unpackhi_epi8(__m256i(), y00lh), _mm256_set1_epi16(Y * 256));
-            __m256i y10 = _mm256_mulhi_epu16(_mm256_unpacklo_epi8(__m256i(), y10lh), _mm256_set1_epi16(Y * 256));
-            __m256i y11 = _mm256_mulhi_epu16(_mm256_unpackhi_epi8(__m256i(), y10lh), _mm256_set1_epi16(Y * 256));
-#else
-            __m256i y00lh = _mm256_load_si256((__m256i*)y0);   y0 += 32;
-            __m256i y10lh = _mm256_load_si256((__m256i*)y1);   y1 += 32;
-            __m256i y00 = _mm256_unpacklo_epi8(y00lh, __m256i());
-            __m256i y01 = _mm256_unpackhi_epi8(y00lh, __m256i());
-            __m256i y10 = _mm256_unpacklo_epi8(y10lh, __m256i());
-            __m256i y11 = _mm256_unpackhi_epi8(y10lh, __m256i());
-#endif
+            __m256i y00lh = _mm256_load_si256((__m256i*)y0); y0 += 32;
+            __m256i y10lh = _mm256_load_si256((__m256i*)y1); y1 += 32;
+            __m256i y00;
+            __m256i y01;
+            __m256i y10;
+            __m256i y11;
+            if (fullRange)
+            {
+                y00 = _mm256_unpacklo_epi8(y00lh, __m256i());
+                y01 = _mm256_unpackhi_epi8(y00lh, __m256i());
+                y10 = _mm256_unpacklo_epi8(y10lh, __m256i());
+                y11 = _mm256_unpackhi_epi8(y10lh, __m256i());
+            }
+            else
+            {
+                y00lh = _mm256_subs_epu8(y00lh, _mm256_set1_epi8(16));
+                y10lh = _mm256_subs_epu8(y10lh, _mm256_set1_epi8(16));
+                y00 = _mm256_mulhi_epu16(_mm256_unpacklo_epi8(__m256i(), y00lh), _mm256_set1_epi16(Y));
+                y01 = _mm256_mulhi_epu16(_mm256_unpackhi_epi8(__m256i(), y00lh), _mm256_set1_epi16(Y));
+                y10 = _mm256_mulhi_epu16(_mm256_unpacklo_epi8(__m256i(), y10lh), _mm256_set1_epi16(Y));
+                y11 = _mm256_mulhi_epu16(_mm256_unpackhi_epi8(__m256i(), y10lh), _mm256_set1_epi16(Y));
+            }
 
             __m256i u00;
             __m256i v00;
             if (interleaved)
             {
-                if (firstV)
+                if (firstU)
                 {
-                    __m256i uv00 = _mm256_loadu_si256((__m256i*)v0);   v0 += 32;
-                    u00 = _mm256_add_epi16(_mm256_and_si256(uv00, _mm256_set1_epi16(0xFF00)), _mm256_set1_epi16(-32768));
-                    v00 = _mm256_add_epi16(_mm256_slli_epi16(uv00, 8), _mm256_set1_epi16(-32768));
+                    __m256i uv00 = _mm256_loadu_si256((__m256i*)u0); u0 += 32;
+                    u00 = _mm256_add_epi16(_mm256_slli_epi16(uv00, 8), _mm256_set1_epi16(-32768));
+                    v00 = _mm256_add_epi16(_mm256_and_si256(uv00, _mm256_set1_epi16(0xFF00)), _mm256_set1_epi16(-32768));
                 }
                 else
                 {
-                    __m256i uv00 = _mm256_loadu_si256((__m256i*)u0);   u0 += 32;
-                    u00 = _mm256_add_epi16(_mm256_slli_epi16(uv00, 8), _mm256_set1_epi16(-32768));
-                    v00 = _mm256_add_epi16(_mm256_and_si256(uv00, _mm256_set1_epi16(0xFF00)), _mm256_set1_epi16(-32768));
+                    __m256i uv00 = _mm256_loadu_si256((__m256i*)v0); v0 += 32;
+                    u00 = _mm256_add_epi16(_mm256_and_si256(uv00, _mm256_set1_epi16(0xFF00)), _mm256_set1_epi16(-32768));
+                    v00 = _mm256_add_epi16(_mm256_slli_epi16(uv00, 8), _mm256_set1_epi16(-32768));
                 }
             }
             else
             {
-                u00 = _mm256_add_epi16(_mm256_slli_epi16(_mm256_cvtepu8_epi16(_mm_load_si128((__m128i*)u0)), 8), _mm256_set1_epi16(-32768));  u0 += 16;
-                v00 = _mm256_add_epi16(_mm256_slli_epi16(_mm256_cvtepu8_epi16(_mm_load_si128((__m128i*)v0)), 8), _mm256_set1_epi16(-32768));  v0 += 16;
+                u00 = _mm256_add_epi16(_mm256_slli_epi16(_mm256_cvtepu8_epi16(_mm_load_si128((__m128i*)u0)), 8), _mm256_set1_epi16(-32768)); u0 += 16;
+                v00 = _mm256_add_epi16(_mm256_slli_epi16(_mm256_cvtepu8_epi16(_mm_load_si128((__m128i*)v0)), 8), _mm256_set1_epi16(-32768)); v0 += 16;
             }
 
-            __m256i dR =                                                                        _mm256_mulhi_epi16(v00, _mm256_set1_epi16(VR * 256));
-            __m256i dG = _mm256_add_epi16(_mm256_mulhi_epi16(u00, _mm256_set1_epi16(UG * 256)), _mm256_mulhi_epi16(v00, _mm256_set1_epi16(VG * 256)));
-            __m256i dB =                  _mm256_mulhi_epi16(u00, _mm256_set1_epi16(UB * 256));
+            __m256i dR =                                                                  _mm256_mulhi_epi16(v00, _mm256_set1_epi16(VR));
+            __m256i dG = _mm256_add_epi16(_mm256_mulhi_epi16(u00, _mm256_set1_epi16(UG)), _mm256_mulhi_epi16(v00, _mm256_set1_epi16(VG)));
+            __m256i dB =                  _mm256_mulhi_epi16(u00, _mm256_set1_epi16(UB));
 
             __m256i xR[2] = { _mm256_unpacklo_epi16(dR, dR), _mm256_unpackhi_epi16(dR, dR) };
             __m256i xG[2] = { _mm256_unpacklo_epi16(dG, dG), _mm256_unpackhi_epi16(dG, dG) };
@@ -361,48 +388,55 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
         int halfWidth8 = (rgbWidth == 4) ? halfWidth / 8 : 0;
         for (int w = 0; w < halfWidth8; ++w)
         {
-#if VIDEO_RANGE
-            __m128i y00lh = _mm_subs_epu8(_mm_loadu_si128((__m128i*)y0), _mm_set1_epi8(16));    y0 += 16;
-            __m128i y10lh = _mm_subs_epu8(_mm_loadu_si128((__m128i*)y1), _mm_set1_epi8(16));    y1 += 16;
-            __m128i y00 = _mm_mulhi_epu16(_mm_unpacklo_epi8(__m128i(), y00lh), _mm_set1_epi16(Y * 256));
-            __m128i y01 = _mm_mulhi_epu16(_mm_unpackhi_epi8(__m128i(), y00lh), _mm_set1_epi16(Y * 256));
-            __m128i y10 = _mm_mulhi_epu16(_mm_unpacklo_epi8(__m128i(), y10lh), _mm_set1_epi16(Y * 256));
-            __m128i y11 = _mm_mulhi_epu16(_mm_unpackhi_epi8(__m128i(), y10lh), _mm_set1_epi16(Y * 256));
-#else
-            __m128i y00lh = _mm_loadu_si128((__m128i*)y0);  y0 += 16;
-            __m128i y10lh = _mm_loadu_si128((__m128i*)y1);  y1 += 16;
-            __m128i y00 = _mm_unpacklo_epi8(y00lh, __m128i());
-            __m128i y01 = _mm_unpackhi_epi8(y00lh, __m128i());
-            __m128i y10 = _mm_unpacklo_epi8(y10lh, __m128i());
-            __m128i y11 = _mm_unpackhi_epi8(y10lh, __m128i());
-#endif
+            __m128i y00lh = _mm_loadu_si128((__m128i*)y0); y0 += 16;
+            __m128i y10lh = _mm_loadu_si128((__m128i*)y1); y1 += 16;
+            __m128i y00;
+            __m128i y01;
+            __m128i y10;
+            __m128i y11;
+            if (fullRange)
+            {
+                y00 = _mm_unpacklo_epi8(y00lh, __m128i());
+                y01 = _mm_unpackhi_epi8(y00lh, __m128i());
+                y10 = _mm_unpacklo_epi8(y10lh, __m128i());
+                y11 = _mm_unpackhi_epi8(y10lh, __m128i());
+            }
+            else
+            {
+                y00lh = _mm_subs_epu8(y00lh, _mm_set1_epi8(16));
+                y10lh = _mm_subs_epu8(y10lh, _mm_set1_epi8(16));
+                y00 = _mm_mulhi_epu16(_mm_unpacklo_epi8(__m128i(), y00lh), _mm_set1_epi16(Y));
+                y01 = _mm_mulhi_epu16(_mm_unpackhi_epi8(__m128i(), y00lh), _mm_set1_epi16(Y));
+                y10 = _mm_mulhi_epu16(_mm_unpacklo_epi8(__m128i(), y10lh), _mm_set1_epi16(Y));
+                y11 = _mm_mulhi_epu16(_mm_unpackhi_epi8(__m128i(), y10lh), _mm_set1_epi16(Y));
+            }
 
             __m128i u00;
             __m128i v00;
             if (interleaved)
             {
-                if (firstV)
+                if (firstU)
                 {
-                    __m128i uv00 = _mm_loadu_si128((__m128i*)v0);   v0 += 16;
-                    u00 = _mm_add_epi16(_mm_and_si128(uv00, _mm_set1_epi16(0xFF00)), _mm_set1_epi16(-32768));
-                    v00 = _mm_add_epi16(_mm_slli_epi16(uv00, 8), _mm_set1_epi16(-32768));
+                    __m128i uv00 = _mm_loadu_si128((__m128i*)u0); u0 += 16;
+                    u00 = _mm_add_epi16(_mm_slli_epi16(uv00, 8), _mm_set1_epi16(-32768));
+                    v00 = _mm_add_epi16(_mm_and_si128(uv00, _mm_set1_epi16(0xFF00)), _mm_set1_epi16(-32768));
                 }
                 else
                 {
-                    __m128i uv00 = _mm_loadu_si128((__m128i*)u0);   u0 += 16;
-                    u00 = _mm_add_epi16(_mm_slli_epi16(uv00, 8), _mm_set1_epi16(-32768));
-                    v00 = _mm_add_epi16(_mm_and_si128(uv00, _mm_set1_epi16(0xFF00)), _mm_set1_epi16(-32768));
+                    __m128i uv00 = _mm_loadu_si128((__m128i*)v0); v0 += 16;
+                    u00 = _mm_add_epi16(_mm_and_si128(uv00, _mm_set1_epi16(0xFF00)), _mm_set1_epi16(-32768));
+                    v00 = _mm_add_epi16(_mm_slli_epi16(uv00, 8), _mm_set1_epi16(-32768));
                 }
             }
             else
             {
-                u00 = _mm_add_epi16(_mm_unpacklo_epi8(__m128i(), _mm_loadl_epi64((__m128i*)u0)), _mm_set1_epi16(-32768));  u0 += 8;
-                v00 = _mm_add_epi16(_mm_unpacklo_epi8(__m128i(), _mm_loadl_epi64((__m128i*)v0)), _mm_set1_epi16(-32768));  v0 += 8;
+                u00 = _mm_add_epi16(_mm_unpacklo_epi8(__m128i(), _mm_loadl_epi64((__m128i*)u0)), _mm_set1_epi16(-32768)); u0 += 8;
+                v00 = _mm_add_epi16(_mm_unpacklo_epi8(__m128i(), _mm_loadl_epi64((__m128i*)v0)), _mm_set1_epi16(-32768)); v0 += 8;
             }
 
-            __m128i dR =                                                               _mm_mulhi_epi16(v00, _mm_set1_epi16(VR * 256));
-            __m128i dG = _mm_add_epi16(_mm_mulhi_epi16(u00, _mm_set1_epi16(UG * 256)), _mm_mulhi_epi16(v00, _mm_set1_epi16(VG * 256)));
-            __m128i dB =               _mm_mulhi_epi16(u00, _mm_set1_epi16(UB * 256));
+            __m128i dR =                                                         _mm_mulhi_epi16(v00, _mm_set1_epi16(VR));
+            __m128i dG = _mm_add_epi16(_mm_mulhi_epi16(u00, _mm_set1_epi16(UG)), _mm_mulhi_epi16(v00, _mm_set1_epi16(VG)));
+            __m128i dB =               _mm_mulhi_epi16(u00, _mm_set1_epi16(UB));
 
             __m128i xR[2] = { _mm_unpacklo_epi16(dR, dR), _mm_unpackhi_epi16(dR, dR) };
             __m128i xG[2] = { _mm_unpacklo_epi16(dG, dG), _mm_unpackhi_epi16(dG, dG) };
@@ -437,17 +471,21 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
 #endif
         for (int w = 0; w < halfWidth; ++w)
         {
-#if VIDEO_RANGE
-            int y00 = (((*y0++) - 16) * (int)(Y * 128)) >> 7;
-            int y01 = (((*y0++) - 16) * (int)(Y * 128)) >> 7;
-            int y10 = (((*y1++) - 16) * (int)(Y * 128)) >> 7;
-            int y11 = (((*y1++) - 16) * (int)(Y * 128)) >> 7;
-#else
             int y00 = (*y0++);
             int y01 = (*y0++);
             int y10 = (*y1++);
             int y11 = (*y1++);
-#endif
+            if (fullRange)
+            {
+            }
+            else
+            {
+                y00 = ((y00 - 16) * Y) >> 8;
+                y01 = ((y01 - 16) * Y) >> 8;
+                y10 = ((y10 - 16) * Y) >> 8;
+                y11 = ((y11 - 16) * Y) >> 8;
+            }
+
             int u00 = (*u0++) - 128;
             int v00 = (*v0++) - 128;
             if (interleaved)
@@ -456,9 +494,9 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
                 v0++;
             }
 
-            int dR = (                        v00 * (int)(VR * 128)) >> 7;
-            int dG = (u00 * (int)(UG * 256) + v00 * (int)(VG * 256)) >> 8;
-            int dB = (u00 * (int)(UB *  64)                        ) >> 6;
+            int dR = (           v00 * VR) >> 8;
+            int dG = (u00 * UG + v00 * VG) >> 8;
+            int dB = (u00 * UB           ) >> 8;
 
             auto clamp = [](int value) -> unsigned char
             {
@@ -492,7 +530,7 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
     }
 }
 //------------------------------------------------------------------------------
-void yuv2rgb_yu12(int width, int height, const void* yuv, void* rgb, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
+void yuv2rgb_yu12(int width, int height, const void* yuv, void* rgb, bool fullRange, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
 {
     int sizeY = align(width, alignWidth) * align(height, alignHeight);
     int sizeUV = align(width / 2, alignWidth) * align(height / 2, alignHeight);
@@ -500,23 +538,47 @@ void yuv2rgb_yu12(int width, int height, const void* yuv, void* rgb, int rgbWidt
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
 
-    if (rgbSwizzle)
+    auto converter = yuv2rgb<3, false, false, false, false>;
+
+    if (rgbWidth == 3)
     {
-        if (rgbWidth == 3)
-            yuv2rgb<3, true, false, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2, rgb, strideRGB);
-        else if (rgbWidth == 4)
-            yuv2rgb<4, true, false, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2, rgb, strideRGB);
+        if (rgbSwizzle)
+        {
+            if (fullRange)
+                converter = yuv2rgb<3, true, false, false, true>;
+            else
+                converter = yuv2rgb<3, true, false, false, false>;
+        }
+        else
+        {
+            if (fullRange)
+                converter = yuv2rgb<3, false, false, false, true>;
+            else
+                converter = yuv2rgb<3, false, false, false, false>;
+        }
     }
-    else
+    else if (rgbWidth == 4)
     {
-        if (rgbWidth == 3)
-            yuv2rgb<3, false, false, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2, rgb, strideRGB);
-        else if (rgbWidth == 4)
-            yuv2rgb<4, false, false, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2, rgb, strideRGB);
+        if (rgbSwizzle)
+        {
+            if (fullRange)
+                converter = yuv2rgb<4, true, false, false, true>;
+            else
+                converter = yuv2rgb<4, true, false, false, false>;
+        }
+        else
+        {
+            if (fullRange)
+                converter = yuv2rgb<4, false, false, false, true>;
+            else
+                converter = yuv2rgb<4, false, false, false, false>;
+        }
     }
+
+    converter(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2, rgb, strideRGB);
 }
 //------------------------------------------------------------------------------
-void yuv2rgb_yv12(int width, int height, const void* yuv, void* rgb, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
+void yuv2rgb_yv12(int width, int height, const void* yuv, void* rgb, bool fullRange, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
 {
     int sizeY = align(width, alignWidth) * align(height, alignHeight);
     int sizeUV = align(width / 2, alignWidth) * align(height / 2, alignHeight);
@@ -524,65 +586,137 @@ void yuv2rgb_yv12(int width, int height, const void* yuv, void* rgb, int rgbWidt
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
 
-    if (rgbSwizzle)
+    auto converter = yuv2rgb<3, false, false, false, false>;
+
+    if (rgbWidth == 3)
     {
-        if (rgbWidth == 3)
-            yuv2rgb<3, true, false, true>(width, height, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2, rgb, strideRGB);
-        else if (rgbWidth == 4)
-            yuv2rgb<4, true, false, true>(width, height, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2, rgb, strideRGB);
+        if (rgbSwizzle)
+        {
+            if (fullRange)
+                converter = yuv2rgb<3, true, false, false, true>;
+            else
+                converter = yuv2rgb<3, true, false, false, false>;
+        }
+        else
+        {
+            if (fullRange)
+                converter = yuv2rgb<3, false, false, false, true>;
+            else
+                converter = yuv2rgb<3, false, false, false, false>;
+        }
     }
-    else
+    else if (rgbWidth == 4)
     {
-        if (rgbWidth == 3)
-            yuv2rgb<3, false, false, true>(width, height, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2, rgb, strideRGB);
-        else if (rgbWidth == 4)
-            yuv2rgb<4, false, false, true>(width, height, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2, rgb, strideRGB);
+        if (rgbSwizzle)
+        {
+            if (fullRange)
+                converter = yuv2rgb<4, true, false, false, true>;
+            else
+                converter = yuv2rgb<4, true, false, false, false>;
+        }
+        else
+        {
+            if (fullRange)
+                converter = yuv2rgb<4, false, false, false, true>;
+            else
+                converter = yuv2rgb<4, false, false, false, false>;
+        }
     }
+
+    converter(width, height, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2, rgb, strideRGB);
 }
 //------------------------------------------------------------------------------
-void yuv2rgb_nv12(int width, int height, const void* yuv, void* rgb, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
+void yuv2rgb_nv12(int width, int height, const void* yuv, void* rgb, bool fullRange, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
 {
     int sizeY = align(width, alignWidth) * align(height, alignHeight);
 
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
 
-    if (rgbSwizzle)
+    auto converter = yuv2rgb<3, false, false, false, false>;
+
+    if (rgbWidth == 3)
     {
-        if (rgbWidth == 3)
-            yuv2rgb<3, true, true, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width, rgb, strideRGB);
-        else if (rgbWidth == 4)
-            yuv2rgb<4, true, true, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width, rgb, strideRGB);
+        if (rgbSwizzle)
+        {
+            if (fullRange)
+                converter = yuv2rgb<3, true, true, true, true>;
+            else
+                converter = yuv2rgb<3, true, true, true, false>;
+        }
+        else
+        {
+            if (fullRange)
+                converter = yuv2rgb<3, false, true, true, true>;
+            else
+                converter = yuv2rgb<3, false, true, true, false>;
+        }
     }
-    else
+    else if (rgbWidth == 4)
     {
-        if (rgbWidth == 3)
-            yuv2rgb<3, false, true, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width, rgb, strideRGB);
-        else if (rgbWidth == 4)
-            yuv2rgb<4, false, true, false>(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width, rgb, strideRGB);
+        if (rgbSwizzle)
+        {
+            if (fullRange)
+                converter = yuv2rgb<4, true, true, true, true>;
+            else
+                converter = yuv2rgb<4, true, true, true, false>;
+        }
+        else
+        {
+            if (fullRange)
+                converter = yuv2rgb<4, false, true, true, true>;
+            else
+                converter = yuv2rgb<4, false, true, true, false>;
+        }
     }
+
+    converter(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width, rgb, strideRGB);
 }
 //------------------------------------------------------------------------------
-void yuv2rgb_nv21(int width, int height, const void* yuv, void* rgb, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
+void yuv2rgb_nv21(int width, int height, const void* yuv, void* rgb, bool fullRange, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
 {
     int sizeY = align(width, alignWidth) * align(height, alignHeight);
 
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
 
-    if (rgbSwizzle)
+    auto converter = yuv2rgb<3, false, false, false, false>;
+
+    if (rgbWidth == 3)
     {
-        if (rgbWidth == 3)
-            yuv2rgb<3, true, true, true>(width, height, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width, rgb, strideRGB);
-        else if (rgbWidth == 4)
-            yuv2rgb<4, true, true, true>(width, height, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width, rgb, strideRGB);
+        if (rgbSwizzle)
+        {
+            if (fullRange)
+                converter = yuv2rgb<3, true, true, false, true>;
+            else
+                converter = yuv2rgb<3, true, true, false, false>;
+        }
+        else
+        {
+            if (fullRange)
+                converter = yuv2rgb<3, false, true, false, true>;
+            else
+                converter = yuv2rgb<3, false, true, false, false>;
+        }
     }
-    else
+    else if (rgbWidth == 4)
     {
-        if (rgbWidth == 3)
-            yuv2rgb<3, false, true, true>(width, height, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width, rgb, strideRGB);
-        else if (rgbWidth == 4)
-            yuv2rgb<4, false, true, true>(width, height, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width, rgb, strideRGB);
+        if (rgbSwizzle)
+        {
+            if (fullRange)
+                converter = yuv2rgb<4, true, true, false, true>;
+            else
+                converter = yuv2rgb<4, true, true, false, false>;
+        }
+        else
+        {
+            if (fullRange)
+                converter = yuv2rgb<4, false, true, false, true>;
+            else
+                converter = yuv2rgb<4, false, true, false, false>;
+        }
     }
+
+    converter(width, height, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width, rgb, strideRGB);
 }
 //------------------------------------------------------------------------------
