@@ -124,10 +124,10 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
             {
                 y00lh = vqsubq_u8(y00lh, vdupq_n_u8(16));
                 y10lh = vqsubq_u8(y10lh, vdupq_n_u8(16));
-                y00 = vshrn_n_u16(vmull_u8(vget_low_u8(y00lh), vdup_n_u8(Y / 2)), 7);
-                y01 = vshrn_n_u16(vmull_u8(vget_high_u8(y00lh), vdup_n_u8(Y / 2)), 7);
-                y10 = vshrn_n_u16(vmull_u8(vget_low_u8(y10lh), vdup_n_u8(Y / 2)), 7);
-                y11 = vshrn_n_u16(vmull_u8(vget_high_u8(y10lh), vdup_n_u8(Y / 2)), 7);
+                y00 = vshrn_n_u16(vmull_u8(vget_low_u8(y00lh), vdup_n_u8(Y >> 1)), 7);
+                y01 = vshrn_n_u16(vmull_u8(vget_high_u8(y00lh), vdup_n_u8(Y >> 1)), 7);
+                y10 = vshrn_n_u16(vmull_u8(vget_low_u8(y10lh), vdup_n_u8(Y >> 1)), 7);
+                y11 = vshrn_n_u16(vmull_u8(vget_high_u8(y10lh), vdup_n_u8(Y >> 1)), 7);
             }
 
             int8x8_t u000;
@@ -159,9 +159,9 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
             }
 
 #if NEON_FAST
-            int16x8_t dR = vshrq_n_s16(                                   vmull_s8(v000, vdup_n_s8(VR / 4)), 6);
-            int16x8_t dG = vshrq_n_s16(vmlal_s8(vmull_s8(u000, vdup_n_s8(UG / 2)), v000, vdup_n_s8(VG / 2)), 7);
-            int16x8_t dB = vshrq_n_s16(         vmull_s8(u000, vdup_n_s8(UB / 8)),                           5);
+            int16x8_t dR = vshrq_n_s16(                                    vmull_s8(v000, vdup_n_s8(VR >> 2)), 6);
+            int16x8_t dG = vshrq_n_s16(vmlal_s8(vmull_s8(u000, vdup_n_s8(UG >> 1)), v000, vdup_n_s8(VG >> 1)), 7);
+            int16x8_t dB = vshrq_n_s16(         vmull_s8(u000, vdup_n_s8(UB >> 3)),                            5);
 #else
             int16x8_t u00 = vshll_n_s8(u000, 7);
             int16x8_t v00 = vshll_n_s8(v000, 7);
