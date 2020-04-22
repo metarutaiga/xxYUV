@@ -85,17 +85,12 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
             int g000 = (g00 + g01 + g10 + g11) / 4;
             int b000 = (b00 + b01 + b10 + b11) / 4;
 
-            // BT.709
-            //      R        G        B
-            // Y =  0.18275  0.61477  0.06200
-            // U = -0.10072 -0.33882  0.43931
-            // V =  0.43867 -0.40048 -0.04038
-            int y00 = r00 * (int)(0.18275 * 128) + g00 * (int)(0.61477 * 128) + b00 * (int)(0.06200 * 128);
-            int y01 = r01 * (int)(0.18275 * 128) + g01 * (int)(0.61477 * 128) + b01 * (int)(0.06200 * 128);
-            int y10 = r10 * (int)(0.18275 * 128) + g10 * (int)(0.61477 * 128) + b10 * (int)(0.06200 * 128);
-            int y11 = r11 * (int)(0.18275 * 128) + g11 * (int)(0.61477 * 128) + b11 * (int)(0.06200 * 128);
-            int u00 = r000 * (int)(-0.10072 * 128) + g000 * (int)(-0.33882 * 128) + b000 * (int)( 0.43931 * 128);
-            int v00 = r000 * (int)( 0.43867 * 128) + g000 * (int)(-0.40048 * 128) + b000 * (int)(-0.04038 * 128);
+            int y00 = r00 * (int)(RY * 128) + g00 * (int)(GY * 128) + b00 * (int)(BY * 128);
+            int y01 = r01 * (int)(RY * 128) + g01 * (int)(GY * 128) + b01 * (int)(BY * 128);
+            int y10 = r10 * (int)(RY * 128) + g10 * (int)(GY * 128) + b10 * (int)(BY * 128);
+            int y11 = r11 * (int)(RY * 128) + g11 * (int)(GY * 128) + b11 * (int)(BY * 128);
+            int u00 = r000 * (int)(RU * 128) + g000 * (int)(GU * 128) + b000 * (int)(BU * 128);
+            int v00 = r000 * (int)(RV * 128) + g000 * (int)(GV * 128) + b000 * (int)(BV * 128);
 
             auto clamp = [](int value) -> unsigned char
             {
