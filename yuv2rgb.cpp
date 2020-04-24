@@ -49,6 +49,10 @@
 #endif
 #include "yuv2rgb.h"
 
+#if defined(__llvm__)
+#   pragma clang diagnostic ignored "-Wunused-variable"
+#endif
+
 #define align(v, a) ((v) + ((a) - 1) & ~((a) - 1))
 
 // BT.709 - Video Range
