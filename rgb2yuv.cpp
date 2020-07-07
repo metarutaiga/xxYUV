@@ -46,6 +46,11 @@
 template<int rgbWidth, bool rgbSwizzle, bool interleaved, bool firstU, bool fullRange>
 void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, void* u, void* v, int strideY, int strideU, int strideV)
 {
+    if (strideRGB < 0)
+    {
+        rgb = (char*)rgb - (strideRGB * (height - 1));
+    }
+
     int halfWidth = width >> 1;
     int halfHeight = height >> 1;
 
