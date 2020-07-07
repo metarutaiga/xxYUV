@@ -186,7 +186,7 @@ void rgb2yuv_yu12(int width, int height, const void* rgb, void* yuv, bool fullRa
         }
     }
 
-    converter(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, width, width / 2, width / 2);
+    converter(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, align(width, alignWidth), align(width / 2, alignWidth), align(width / 2, alignWidth));
 }
 //------------------------------------------------------------------------------
 void rgb2yuv_yv12(int width, int height, const void* rgb, void* yuv, bool fullRange, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
@@ -234,7 +234,7 @@ void rgb2yuv_yv12(int width, int height, const void* rgb, void* yuv, bool fullRa
         }
     }
 
-    converter(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, width, width / 2, width / 2);
+    converter(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, align(width, alignWidth), align(width / 2, alignWidth), align(width / 2, alignWidth));
 }
 //------------------------------------------------------------------------------
 void rgb2yuv_nv12(int width, int height, const void* rgb, void* yuv, bool fullRange, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
@@ -281,7 +281,7 @@ void rgb2yuv_nv12(int width, int height, const void* rgb, void* yuv, bool fullRa
         }
     }
 
-    converter(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, width, width, width);
+    converter(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, align(width, alignWidth), align(width, alignWidth), align(width, alignWidth));
 }
 //------------------------------------------------------------------------------
 void rgb2yuv_nv21(int width, int height, const void* rgb, void* yuv, bool fullRange, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
@@ -328,6 +328,6 @@ void rgb2yuv_nv21(int width, int height, const void* rgb, void* yuv, bool fullRa
         }
     }
 
-    converter(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, width, width, width);
+    converter(width, height, rgb, strideRGB, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, align(width, alignWidth), align(width, alignWidth), align(width, alignWidth));
 }
 //------------------------------------------------------------------------------
