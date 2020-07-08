@@ -6,6 +6,27 @@
 //==============================================================================
 #if defined(__ARM_NEON__) || defined(__ARM_NEON) || defined(_M_ARM) || defined(_M_ARM64)
 #   include <arm_neon.h>
+#elif defined(_M_IX86) || defined(_M_AMD64) || defined(__i386__) || defined(__amd64__)
+#   include <immintrin.h>
+#   define _MM_DEINTERLACE4_EPI8(R0, R1, R2, R3) {  \
+        __m128i T0, T1, T2, T3;                     \
+        T0 = _mm_unpacklo_epi8(R0, R1);             \
+        T1 = _mm_unpacklo_epi8(R2, R3);             \
+        T2 = _mm_unpackhi_epi8(R0, R1);             \
+        T3 = _mm_unpackhi_epi8(R2, R3);             \
+        R0 = _mm_unpacklo_epi8(T0, T2);             \
+        R1 = _mm_unpackhi_epi8(T0, T2);             \
+        R2 = _mm_unpacklo_epi8(T1, T3);             \
+        R3 = _mm_unpackhi_epi8(T1, T3);             \
+        T0 = _mm_unpacklo_epi32(R0, R2);            \
+        T1 = _mm_unpackhi_epi32(R0, R2);            \
+        T2 = _mm_unpacklo_epi32(R1, R3);            \
+        T3 = _mm_unpackhi_epi32(R1, R3);            \
+        R0 = _mm_unpacklo_epi8(T0, T2);             \
+        R1 = _mm_unpackhi_epi8(T0, T2);             \
+        R2 = _mm_unpacklo_epi8(T1, T3);             \
+        R3 = _mm_unpackhi_epi8(T1, T3);             \
+    }
 #endif
 #include "rgb2yuv.h"
 
@@ -137,6 +158,74 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
             {
                 vst1_u8(u0, u00); u0 += 8;
                 vst1_u8(v0, v00); v0 += 8;
+            }
+        }
+        if (rgbWidth == 4)
+            continue;
+#elif defined(_M_IX86) || defined(_M_AMD64) || defined(__i386__) || defined(__amd64__)
+        int halfWidth8 = (rgbWidth == 4) ? halfWidth / 8 : 0;
+        for (int w = 0; w < halfWidth8; ++w)
+        {
+            __m128i rgb00[4] = { _mm_loadu_si128((__m128i*)rgb0), _mm_loadu_si128((__m128i*)rgb0 + 1), _mm_loadu_si128((__m128i*)rgb0 + 2), _mm_loadu_si128((__m128i*)rgb0 + 3) };  rgb0 += 16 * 4;
+            __m128i rgb10[4] = { _mm_loadu_si128((__m128i*)rgb1), _mm_loadu_si128((__m128i*)rgb1 + 1), _mm_loadu_si128((__m128i*)rgb1 + 2), _mm_loadu_si128((__m128i*)rgb1 + 3) };  rgb1 += 16 * 4;
+            _MM_DEINTERLACE4_EPI8(rgb00[0], rgb00[1], rgb00[2], rgb00[3]);
+            _MM_DEINTERLACE4_EPI8(rgb10[0], rgb10[1], rgb10[2], rgb10[3]);
+
+            __m128i r00 = _mm_unpacklo_epi8(rgb00[iR], __m128i());
+            __m128i g00 = _mm_unpacklo_epi8(rgb00[iG], __m128i());
+            __m128i b00 = _mm_unpacklo_epi8(rgb00[iB], __m128i());
+            __m128i r01 = _mm_unpackhi_epi8(rgb00[iR], __m128i());
+            __m128i g01 = _mm_unpackhi_epi8(rgb00[iG], __m128i());
+            __m128i b01 = _mm_unpackhi_epi8(rgb00[iB], __m128i());
+            __m128i r10 = _mm_unpacklo_epi8(rgb10[iR], __m128i());
+            __m128i g10 = _mm_unpacklo_epi8(rgb10[iG], __m128i());
+            __m128i b10 = _mm_unpacklo_epi8(rgb10[iB], __m128i());
+            __m128i r11 = _mm_unpackhi_epi8(rgb10[iR], __m128i());
+            __m128i g11 = _mm_unpackhi_epi8(rgb10[iG], __m128i());
+            __m128i b11 = _mm_unpackhi_epi8(rgb10[iB], __m128i());
+
+            __m128i y00 = _mm_add_epi16(_mm_add_epi16(_mm_mullo_epi16(r00, _mm_set1_epi16(RY)), _mm_mullo_epi16(g00, _mm_set1_epi16(GY))), _mm_mullo_epi16(b00, _mm_set1_epi16(BY)));
+            __m128i y01 = _mm_add_epi16(_mm_add_epi16(_mm_mullo_epi16(r01, _mm_set1_epi16(RY)), _mm_mullo_epi16(g01, _mm_set1_epi16(GY))), _mm_mullo_epi16(b01, _mm_set1_epi16(BY)));
+            __m128i y10 = _mm_add_epi16(_mm_add_epi16(_mm_mullo_epi16(r10, _mm_set1_epi16(RY)), _mm_mullo_epi16(g10, _mm_set1_epi16(GY))), _mm_mullo_epi16(b10, _mm_set1_epi16(BY)));
+            __m128i y11 = _mm_add_epi16(_mm_add_epi16(_mm_mullo_epi16(r11, _mm_set1_epi16(RY)), _mm_mullo_epi16(g11, _mm_set1_epi16(GY))), _mm_mullo_epi16(b11, _mm_set1_epi16(BY)));
+            y00 = _mm_srli_epi16(y00, 8);
+            y01 = _mm_srli_epi16(y01, 8);
+            y10 = _mm_srli_epi16(y10, 8);
+            y11 = _mm_srli_epi16(y11, 8);
+            __m128i y000 = _mm_packus_epi16(y00, y01);
+            __m128i y100 = _mm_packus_epi16(y10, y11);
+
+            __m128i r000 = _mm_avg_epu8(rgb00[iR], rgb10[iR]);
+            __m128i g000 = _mm_avg_epu8(rgb00[iG], rgb10[iG]);
+            __m128i b000 = _mm_avg_epu8(rgb00[iB], rgb10[iB]);
+            r000 = _mm_add_epi16(_mm_and_si128(r000, _mm_set1_epi16(0xFF)), _mm_srli_epi16(r000, 8));
+            g000 = _mm_add_epi16(_mm_and_si128(g000, _mm_set1_epi16(0xFF)), _mm_srli_epi16(g000, 8));
+            b000 = _mm_add_epi16(_mm_and_si128(b000, _mm_set1_epi16(0xFF)), _mm_srli_epi16(b000, 8));
+
+            __m128i u00 = _mm_add_epi16(_mm_add_epi16(_mm_mullo_epi16(r000, _mm_set1_epi16(RU >> 1)), _mm_mullo_epi16(g000, _mm_set1_epi16(GU >> 1))), _mm_mullo_epi16(b000, _mm_set1_epi16(BU >> 1)));
+            __m128i v00 = _mm_add_epi16(_mm_add_epi16(_mm_mullo_epi16(r000, _mm_set1_epi16(RV >> 1)), _mm_mullo_epi16(g000, _mm_set1_epi16(GV >> 1))), _mm_mullo_epi16(b000, _mm_set1_epi16(BV >> 1)));
+            u00 = _mm_sub_epi8(_mm_packus_epi16(_mm_srli_epi16(u00, 8), __m128()), _mm_set1_epi8(-128));
+            v00 = _mm_sub_epi8(_mm_packus_epi16(_mm_srli_epi16(v00, 8), __m128()), _mm_set1_epi8(-128));
+
+            _mm_storeu_si128((__m128i*)y0, y000); y0 += 16;
+            _mm_storeu_si128((__m128i*)y1, y100); y1 += 16;
+            if (interleaved)
+            {
+                if (firstU)
+                {
+                    __m128i uv00 = _mm_unpacklo_epi8(v00, u00);
+                    _mm_storeu_si128((__m128i*)u0, uv00); u0 += 16;
+                }
+                else
+                {
+                    __m128i uv00 = _mm_unpacklo_epi8(u00, v00);
+                    _mm_storeu_si128((__m128i*)v0, uv00); v0 += 16;
+                }
+            }
+            else
+            {
+                _mm_storeu_si64(u0, v00); u0 += 8;
+                _mm_storeu_si64(v0, u00); v0 += 8;
             }
         }
         if (rgbWidth == 4)
