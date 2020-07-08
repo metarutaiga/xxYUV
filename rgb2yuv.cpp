@@ -91,32 +91,32 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
             uint8x16x4_t rgb00 = vld4q_u8(rgb0);  rgb0 += 16 * 4;
             uint8x16x4_t rgb10 = vld4q_u8(rgb1);  rgb1 += 16 * 4;
 
-            int16x8_t r00 = vmovl_u8(vget_low_u8(rgb00.val[iR]));
-            int16x8_t g00 = vmovl_u8(vget_low_u8(rgb00.val[iG]));
-            int16x8_t b00 = vmovl_u8(vget_low_u8(rgb00.val[iB]));
-            int16x8_t r01 = vmovl_u8(vget_high_u8(rgb00.val[iR]));
-            int16x8_t g01 = vmovl_u8(vget_high_u8(rgb00.val[iG]));
-            int16x8_t b01 = vmovl_u8(vget_high_u8(rgb00.val[iB]));
-            int16x8_t r10 = vmovl_u8(vget_low_u8(rgb10.val[iR]));
-            int16x8_t g10 = vmovl_u8(vget_low_u8(rgb10.val[iG]));
-            int16x8_t b10 = vmovl_u8(vget_low_u8(rgb10.val[iB]));
-            int16x8_t r11 = vmovl_u8(vget_high_u8(rgb10.val[iR]));
-            int16x8_t g11 = vmovl_u8(vget_high_u8(rgb10.val[iG]));
-            int16x8_t b11 = vmovl_u8(vget_high_u8(rgb10.val[iB]));
+            uint8x8_t r00 = vget_low_u8(rgb00.val[iR]);
+            uint8x8_t g00 = vget_low_u8(rgb00.val[iG]);
+            uint8x8_t b00 = vget_low_u8(rgb00.val[iB]);
+            uint8x8_t r01 = vget_high_u8(rgb00.val[iR]);
+            uint8x8_t g01 = vget_high_u8(rgb00.val[iG]);
+            uint8x8_t b01 = vget_high_u8(rgb00.val[iB]);
+            uint8x8_t r10 = vget_low_u8(rgb10.val[iR]);
+            uint8x8_t g10 = vget_low_u8(rgb10.val[iG]);
+            uint8x8_t b10 = vget_low_u8(rgb10.val[iB]);
+            uint8x8_t r11 = vget_high_u8(rgb10.val[iR]);
+            uint8x8_t g11 = vget_high_u8(rgb10.val[iG]);
+            uint8x8_t b11 = vget_high_u8(rgb10.val[iB]);
 
-            int16x8_t y00 = vshrq_n_s16(vmlaq_s16(vmlaq_s16(vmulq_s16(r00, vdupq_n_s16(RY >> 1)), g00, vdupq_n_s16(GY >> 1)), b00, vdupq_n_s16(BY >> 1)), 7);
-            int16x8_t y01 = vshrq_n_s16(vmlaq_s16(vmlaq_s16(vmulq_s16(r01, vdupq_n_s16(RY >> 1)), g01, vdupq_n_s16(GY >> 1)), b01, vdupq_n_s16(BY >> 1)), 7);
-            int16x8_t y10 = vshrq_n_s16(vmlaq_s16(vmlaq_s16(vmulq_s16(r10, vdupq_n_s16(RY >> 1)), g10, vdupq_n_s16(GY >> 1)), b10, vdupq_n_s16(BY >> 1)), 7);
-            int16x8_t y11 = vshrq_n_s16(vmlaq_s16(vmlaq_s16(vmulq_s16(r11, vdupq_n_s16(RY >> 1)), g11, vdupq_n_s16(GY >> 1)), b11, vdupq_n_s16(BY >> 1)), 7);
-            uint8x16_t y000 = vcombine_u8(vqmovun_s16(y00), vqmovun_s16(y01));
-            uint8x16_t y100 = vcombine_u8(vqmovun_s16(y10), vqmovun_s16(y11));
+            uint16x8_t y00 = vshrq_n_u16(vmlal_u8(vmlal_u8(vmull_u8(r00, vdup_n_u8(RY)), g00, vdup_n_u8(GY)), b00, vdup_n_u8(BY)), 8);
+            uint16x8_t y01 = vshrq_n_u16(vmlal_u8(vmlal_u8(vmull_u8(r01, vdup_n_u8(RY)), g01, vdup_n_u8(GY)), b01, vdup_n_u8(BY)), 8);
+            uint16x8_t y10 = vshrq_n_u16(vmlal_u8(vmlal_u8(vmull_u8(r10, vdup_n_u8(RY)), g10, vdup_n_u8(GY)), b10, vdup_n_u8(BY)), 8);
+            uint16x8_t y11 = vshrq_n_u16(vmlal_u8(vmlal_u8(vmull_u8(r11, vdup_n_u8(RY)), g11, vdup_n_u8(GY)), b11, vdup_n_u8(BY)), 8);
+            uint8x16_t y000 = vcombine_u8(vqmovn_u16(y00), vqmovn_u16(y01));
+            uint8x16_t y100 = vcombine_u8(vqmovn_u16(y10), vqmovn_u16(y11));
 
-            int16x8_t r000 = vshrq_n_u16(vpadalq_u8(vpaddlq_u8(rgb00.val[iR]), rgb10.val[iR]), 2);
-            int16x8_t g000 = vshrq_n_u16(vpadalq_u8(vpaddlq_u8(rgb00.val[iG]), rgb10.val[iG]), 2);
-            int16x8_t b000 = vshrq_n_u16(vpadalq_u8(vpaddlq_u8(rgb00.val[iB]), rgb10.val[iB]), 2);
+            int16x8_t r000 = vpadalq_u8(vpaddlq_u8(rgb00.val[iR]), rgb10.val[iR]);
+            int16x8_t g000 = vpadalq_u8(vpaddlq_u8(rgb00.val[iG]), rgb10.val[iG]);
+            int16x8_t b000 = vpadalq_u8(vpaddlq_u8(rgb00.val[iB]), rgb10.val[iB]);
 
-            uint8x8_t u00 = vreinterpret_u8_s8(vsub_s8(vrshrn_n_s16(vmlaq_s16(vmlaq_s16(vmulq_s16(r000, vdupq_n_s16(RU >> 1)), g000, vdupq_n_s16(GU >> 1)), b000, vdupq_n_s16(BU >> 1)), 7), vdup_n_s8(-128)));
-            uint8x8_t v00 = vreinterpret_u8_s8(vsub_s8(vrshrn_n_s16(vmlaq_s16(vmlaq_s16(vmulq_s16(r000, vdupq_n_s16(RV >> 1)), g000, vdupq_n_s16(GV >> 1)), b000, vdupq_n_s16(BV >> 1)), 7), vdup_n_s8(-128)));
+            uint8x8_t u00 = vreinterpret_u8_s8(vsub_s8(vrshrn_n_s16(vmlaq_s16(vmlaq_s16(vmulq_s16(r000, vdupq_n_s16(RU >> 2)), g000, vdupq_n_s16(GU >> 2)), b000, vdupq_n_s16(BU >> 2)), 8), vdup_n_s8(-128)));
+            uint8x8_t v00 = vreinterpret_u8_s8(vsub_s8(vrshrn_n_s16(vmlaq_s16(vmlaq_s16(vmulq_s16(r000, vdupq_n_s16(RV >> 2)), g000, vdupq_n_s16(GV >> 2)), b000, vdupq_n_s16(BV >> 2)), 8), vdup_n_s8(-128)));
 
             vst1q_u8(y0, y000); y0 += 16;
             vst1q_u8(y1, y100); y1 += 16;
