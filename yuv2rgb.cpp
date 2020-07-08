@@ -541,10 +541,12 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
     }
 }
 //------------------------------------------------------------------------------
-void yuv2rgb_yu12(int width, int height, const void* yuv, void* rgb, bool fullRange, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
+void yuv2rgb_yu12(int width, int height, const void* yuv, void* rgb, bool fullRange, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight, int alignSize)
 {
-    int sizeY = align(width, alignWidth) * align(height, alignHeight);
-    int sizeUV = align(width / 2, alignWidth) * align(height / 2, alignHeight);
+    int strideY = align(width, alignWidth);
+    int strideU = align(width, alignWidth) / 2;
+    int sizeY = align(strideY * align(height, alignHeight), alignSize);
+    int sizeU = align(strideU * align(height, alignHeight) / 2, alignSize);
 
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
@@ -586,13 +588,15 @@ void yuv2rgb_yu12(int width, int height, const void* yuv, void* rgb, bool fullRa
         }
     }
 
-    converter(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeUV, align(width, alignWidth), align(width / 2, alignWidth), align(width / 2, alignWidth), rgb, strideRGB);
+    converter(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + sizeU, strideY, strideU, strideU, rgb, strideRGB);
 }
 //------------------------------------------------------------------------------
-void yuv2rgb_yv12(int width, int height, const void* yuv, void* rgb, bool fullRange, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
+void yuv2rgb_yv12(int width, int height, const void* yuv, void* rgb, bool fullRange, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight, int alignSize)
 {
-    int sizeY = align(width, alignWidth) * align(height, alignHeight);
-    int sizeUV = align(width / 2, alignWidth) * align(height / 2, alignHeight);
+    int strideY = align(width, alignWidth);
+    int strideU = align(width, alignWidth) / 2;
+    int sizeY = align(strideY * align(height, alignHeight), alignSize);
+    int sizeU = align(strideU * align(height, alignHeight) / 2, alignSize);
 
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
@@ -634,12 +638,14 @@ void yuv2rgb_yv12(int width, int height, const void* yuv, void* rgb, bool fullRa
         }
     }
 
-    converter(width, height, yuv, (char*)yuv + sizeY + sizeUV, (char*)yuv + sizeY, align(width, alignWidth), align(width / 2, alignWidth), align(width / 2, alignWidth), rgb, strideRGB);
+    converter(width, height, yuv, (char*)yuv + sizeY + sizeU, (char*)yuv + sizeY, strideY, strideU, strideU, rgb, strideRGB);
 }
 //------------------------------------------------------------------------------
-void yuv2rgb_nv12(int width, int height, const void* yuv, void* rgb, bool fullRange, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
+void yuv2rgb_nv12(int width, int height, const void* yuv, void* rgb, bool fullRange, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight, int alignSize)
 {
-    int sizeY = align(width, alignWidth) * align(height, alignHeight);
+    int strideYUV = align(width, alignWidth);
+    int sizeY = align(strideYUV * align(height, alignHeight), alignSize);
+    int sizeUV = align(strideYUV * align(height, alignHeight) / 2, alignSize);
 
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
@@ -681,12 +687,14 @@ void yuv2rgb_nv12(int width, int height, const void* yuv, void* rgb, bool fullRa
         }
     }
 
-    converter(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, align(width, alignWidth), align(width, alignWidth), align(width, alignWidth), rgb, strideRGB);
+    converter(width, height, yuv, (char*)yuv + sizeY, (char*)yuv + sizeY + 1, strideYUV, strideYUV, strideYUV, rgb, strideRGB);
 }
 //------------------------------------------------------------------------------
-void yuv2rgb_nv21(int width, int height, const void* yuv, void* rgb, bool fullRange, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight)
+void yuv2rgb_nv21(int width, int height, const void* yuv, void* rgb, bool fullRange, int rgbWidth, bool rgbSwizzle, int strideRGB, int alignWidth, int alignHeight, int alignSize)
 {
-    int sizeY = align(width, alignWidth) * align(height, alignHeight);
+    int strideYUV = align(width, alignWidth);
+    int sizeY = align(strideYUV * align(height, alignHeight), alignSize);
+    int sizeUV = align(strideYUV * align(height, alignHeight) / 2, alignSize);
 
     if (strideRGB == 0)
         strideRGB = rgbWidth * width;
@@ -728,6 +736,6 @@ void yuv2rgb_nv21(int width, int height, const void* yuv, void* rgb, bool fullRa
         }
     }
 
-    converter(width, height, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, align(width, alignWidth), align(width, alignWidth), align(width, alignWidth), rgb, strideRGB);
+    converter(width, height, yuv, (char*)yuv + sizeY + 1, (char*)yuv + sizeY, strideYUV, strideYUV, strideYUV, rgb, strideRGB);
 }
 //------------------------------------------------------------------------------
