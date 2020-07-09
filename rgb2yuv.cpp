@@ -38,33 +38,33 @@
 
 // BT.709 - Video Range
 //      R        G        B
-// Y =  0.21260  0.71520  0.07220
-// U = -0.11412 -0.38392  0.49804
-// V =  0.49804 -0.45237 -0.04567
-//
-// BT.709 - Full Range
-//      R        G        B
 // Y =  0.18275  0.61477  0.06200
 // U = -0.10072 -0.33882  0.43931
 // V =  0.43867 -0.40048 -0.04038
-#define vRY  0.21260
-#define vGY  0.71520
-#define vBY  0.07220
-#define vRU -0.11412
-#define vGU -0.38392
-#define vBU  0.49804
-#define vRV  0.49804
-#define vGV -0.45237
-#define vBV -0.04567
-#define fRY  0.18275
-#define fGY  0.61477
-#define fBY  0.06200
-#define fRU -0.10072
-#define fGU -0.33882
-#define fBU  0.43931
-#define fRV  0.43867
-#define fGV -0.40048
-#define fBV -0.04038
+//
+// BT.709 - Full Range
+//      R        G        B
+// Y =  0.21260  0.71520  0.07220
+// U = -0.11412 -0.38392  0.49804
+// V =  0.49804 -0.45237 -0.04567
+#define fRY  0.21260
+#define fGY  0.71520
+#define fBY  0.07220
+#define fRU -0.11412
+#define fGU -0.38392
+#define fBU  0.49804
+#define fRV  0.49804
+#define fGV -0.45237
+#define fBV -0.04567
+#define vRY  0.18275
+#define vGY  0.61477
+#define vBY  0.06200
+#define vRU -0.10072
+#define vGU -0.33882
+#define vBU  0.43931
+#define vRV  0.43867
+#define vGV -0.40048
+#define vBV -0.04038
 
 //------------------------------------------------------------------------------
 template<int rgbWidth, bool rgbSwizzle, bool interleaved, bool firstU, bool fullRange>
@@ -125,10 +125,24 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
             uint8x8_t g11 = vget_high_u8(rgb10.val[iG]);
             uint8x8_t b11 = vget_high_u8(rgb10.val[iB]);
 
-            uint16x8_t y00 = vshrq_n_u16(vmlal_u8(vmlal_u8(vmull_u8(r00, vdup_n_u8(RY)), g00, vdup_n_u8(GY)), b00, vdup_n_u8(BY)), 8);
-            uint16x8_t y01 = vshrq_n_u16(vmlal_u8(vmlal_u8(vmull_u8(r01, vdup_n_u8(RY)), g01, vdup_n_u8(GY)), b01, vdup_n_u8(BY)), 8);
-            uint16x8_t y10 = vshrq_n_u16(vmlal_u8(vmlal_u8(vmull_u8(r10, vdup_n_u8(RY)), g10, vdup_n_u8(GY)), b10, vdup_n_u8(BY)), 8);
-            uint16x8_t y11 = vshrq_n_u16(vmlal_u8(vmlal_u8(vmull_u8(r11, vdup_n_u8(RY)), g11, vdup_n_u8(GY)), b11, vdup_n_u8(BY)), 8);
+            uint16x8_t y00;
+            uint16x8_t y01;
+            uint16x8_t y10;
+            uint16x8_t y11;
+            if (fullRange == false)
+            {
+                y00 = vshrq_n_u16(vmlal_u8(vmlal_u8(vmlal_u8(vdupq_n_u16(16 << 8), r00, vdup_n_u8(RY)), g00, vdup_n_u8(GY)), b00, vdup_n_u8(BY)), 8);
+                y01 = vshrq_n_u16(vmlal_u8(vmlal_u8(vmlal_u8(vdupq_n_u16(16 << 8), r01, vdup_n_u8(RY)), g01, vdup_n_u8(GY)), b01, vdup_n_u8(BY)), 8);
+                y10 = vshrq_n_u16(vmlal_u8(vmlal_u8(vmlal_u8(vdupq_n_u16(16 << 8), r10, vdup_n_u8(RY)), g10, vdup_n_u8(GY)), b10, vdup_n_u8(BY)), 8);
+                y11 = vshrq_n_u16(vmlal_u8(vmlal_u8(vmlal_u8(vdupq_n_u16(16 << 8), r11, vdup_n_u8(RY)), g11, vdup_n_u8(GY)), b11, vdup_n_u8(BY)), 8);
+            }
+            else
+            {
+                y00 = vshrq_n_u16(vmlal_u8(vmlal_u8(vmull_u8(r00, vdup_n_u8(RY)), g00, vdup_n_u8(GY)), b00, vdup_n_u8(BY)), 8);
+                y01 = vshrq_n_u16(vmlal_u8(vmlal_u8(vmull_u8(r01, vdup_n_u8(RY)), g01, vdup_n_u8(GY)), b01, vdup_n_u8(BY)), 8);
+                y10 = vshrq_n_u16(vmlal_u8(vmlal_u8(vmull_u8(r10, vdup_n_u8(RY)), g10, vdup_n_u8(GY)), b10, vdup_n_u8(BY)), 8);
+                y11 = vshrq_n_u16(vmlal_u8(vmlal_u8(vmull_u8(r11, vdup_n_u8(RY)), g11, vdup_n_u8(GY)), b11, vdup_n_u8(BY)), 8);
+            }
             uint8x16_t y000 = vcombine_u8(vqmovn_u16(y00), vqmovn_u16(y01));
             uint8x16_t y100 = vcombine_u8(vqmovn_u16(y10), vqmovn_u16(y11));
 
@@ -136,8 +150,8 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
             int16x8_t g000 = vpadalq_u8(vpaddlq_u8(rgb00.val[iG]), rgb10.val[iG]);
             int16x8_t b000 = vpadalq_u8(vpaddlq_u8(rgb00.val[iB]), rgb10.val[iB]);
 
-            uint8x8_t u00 = vreinterpret_u8_s8(vsub_s8(vrshrn_n_s16(vmlaq_s16(vmlaq_s16(vmulq_s16(r000, vdupq_n_s16(RU >> 2)), g000, vdupq_n_s16(GU >> 2)), b000, vdupq_n_s16(BU >> 2)), 8), vdup_n_s8(-128)));
-            uint8x8_t v00 = vreinterpret_u8_s8(vsub_s8(vrshrn_n_s16(vmlaq_s16(vmlaq_s16(vmulq_s16(r000, vdupq_n_s16(RV >> 2)), g000, vdupq_n_s16(GV >> 2)), b000, vdupq_n_s16(BV >> 2)), 8), vdup_n_s8(-128)));
+            uint8x8_t u00 = vrshrn_n_s16(vmlaq_s16(vmlaq_s16(vmlaq_s16(vdupq_n_u16(128 << 8), r000, vdupq_n_s16(RU >> 2)), g000, vdupq_n_s16(GU >> 2)), b000, vdupq_n_s16(BU >> 2)), 8);
+            uint8x8_t v00 = vrshrn_n_s16(vmlaq_s16(vmlaq_s16(vmlaq_s16(vdupq_n_u16(128 << 8), r000, vdupq_n_s16(RV >> 2)), g000, vdupq_n_s16(GV >> 2)), b000, vdupq_n_s16(BV >> 2)), 8);
 
             vst1q_u8(y0, y000); y0 += 16;
             vst1q_u8(y1, y100); y1 += 16;
@@ -156,8 +170,8 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
             }
             else
             {
-                vst1_u8(u0, u00); u0 += 8;
-                vst1_u8(v0, v00); v0 += 8;
+                vst1_u8(u0, v00); u0 += 8;
+                vst1_u8(v0, u00); v0 += 8;
             }
         }
         if (rgbWidth == 4)
@@ -192,6 +206,13 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
             y01 = _mm_srli_epi16(y01, 8);
             y10 = _mm_srli_epi16(y10, 8);
             y11 = _mm_srli_epi16(y11, 8);
+            if (fullRange == false)
+            {
+                y00 = _mm_add_epi16(y00, _mm_set1_epi16(16));
+                y01 = _mm_add_epi16(y01, _mm_set1_epi16(16));
+                y10 = _mm_add_epi16(y10, _mm_set1_epi16(16));
+                y11 = _mm_add_epi16(y11, _mm_set1_epi16(16));
+            }
             __m128i y000 = _mm_packus_epi16(y00, y01);
             __m128i y100 = _mm_packus_epi16(y10, y11);
 
@@ -204,8 +225,12 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
 
             __m128i u00 = _mm_add_epi16(_mm_add_epi16(_mm_mullo_epi16(r000, _mm_set1_epi16(RU >> 1)), _mm_mullo_epi16(g000, _mm_set1_epi16(GU >> 1))), _mm_mullo_epi16(b000, _mm_set1_epi16(BU >> 1)));
             __m128i v00 = _mm_add_epi16(_mm_add_epi16(_mm_mullo_epi16(r000, _mm_set1_epi16(RV >> 1)), _mm_mullo_epi16(g000, _mm_set1_epi16(GV >> 1))), _mm_mullo_epi16(b000, _mm_set1_epi16(BV >> 1)));
-            u00 = _mm_sub_epi8(_mm_packus_epi16(_mm_srli_epi16(u00, 8), __m128()), _mm_set1_epi8(-128));
-            v00 = _mm_sub_epi8(_mm_packus_epi16(_mm_srli_epi16(v00, 8), __m128()), _mm_set1_epi8(-128));
+            u00 = _mm_srai_epi16(u00, 8);
+            v00 = _mm_srai_epi16(v00, 8);
+            u00 = _mm_add_epi16(u00, _mm_set1_epi16(128));
+            v00 = _mm_add_epi16(v00, _mm_set1_epi16(128));
+            u00 = _mm_packus_epi16(u00, __m128());
+            v00 = _mm_packus_epi16(v00, __m128());
 
             _mm_storeu_si128((__m128i*)y0, y000); y0 += 16;
             _mm_storeu_si128((__m128i*)y1, y100); y1 += 16;
@@ -266,7 +291,7 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
                 return (unsigned char)(value < 255 ? value < 0 ? 0 : value : 255);
             };
 
-            if (fullRange)
+            if (fullRange == false)
             {
                 (*y0++) = clamp((y00 >> 8) + 16);
                 (*y0++) = clamp((y01 >> 8) + 16);
