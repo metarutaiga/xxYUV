@@ -182,30 +182,42 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
         {
             __m128i rgb00[4] = { _mm_loadu_si128((__m128i*)rgb0), _mm_loadu_si128((__m128i*)rgb0 + 1), _mm_loadu_si128((__m128i*)rgb0 + 2), _mm_loadu_si128((__m128i*)rgb0 + 3) };  rgb0 += 16 * 4;
             __m128i rgb10[4] = { _mm_loadu_si128((__m128i*)rgb1), _mm_loadu_si128((__m128i*)rgb1 + 1), _mm_loadu_si128((__m128i*)rgb1 + 2), _mm_loadu_si128((__m128i*)rgb1 + 3) };  rgb1 += 16 * 4;
-            _MM_DEINTERLACE4_EPI8(rgb00[0], rgb00[1], rgb00[2], rgb00[3]);
-            _MM_DEINTERLACE4_EPI8(rgb10[0], rgb10[1], rgb10[2], rgb10[3]);
 
-            __m128i r00 = _mm_unpacklo_epi8(rgb00[iR], __m128i());
-            __m128i g00 = _mm_unpacklo_epi8(rgb00[iG], __m128i());
-            __m128i b00 = _mm_unpacklo_epi8(rgb00[iB], __m128i());
-            __m128i r01 = _mm_unpackhi_epi8(rgb00[iR], __m128i());
-            __m128i g01 = _mm_unpackhi_epi8(rgb00[iG], __m128i());
-            __m128i b01 = _mm_unpackhi_epi8(rgb00[iB], __m128i());
-            __m128i r10 = _mm_unpacklo_epi8(rgb10[iR], __m128i());
-            __m128i g10 = _mm_unpacklo_epi8(rgb10[iG], __m128i());
-            __m128i b10 = _mm_unpacklo_epi8(rgb10[iB], __m128i());
-            __m128i r11 = _mm_unpackhi_epi8(rgb10[iR], __m128i());
-            __m128i g11 = _mm_unpackhi_epi8(rgb10[iG], __m128i());
-            __m128i b11 = _mm_unpackhi_epi8(rgb10[iB], __m128i());
+#if defined(__SSSE3__)
+            __m128i yy = _mm_setr_epi8(RY >> 1, GY >> 1, BY >> 1, 0, RY >> 1, GY >> 1, BY >> 1, 0, RY >> 1, GY >> 1, BY >> 1, 0, RY >> 1, GY >> 1, BY >> 1, 0);
+            __m128i yy000 = _mm_maddubs_epi16(rgb00[0], yy);
+            __m128i yy001 = _mm_maddubs_epi16(rgb00[1], yy);
+            __m128i yy010 = _mm_maddubs_epi16(rgb00[2], yy);
+            __m128i yy011 = _mm_maddubs_epi16(rgb00[3], yy);
+            __m128i yy100 = _mm_maddubs_epi16(rgb10[0], yy);
+            __m128i yy101 = _mm_maddubs_epi16(rgb10[1], yy);
+            __m128i yy110 = _mm_maddubs_epi16(rgb10[2], yy);
+            __m128i yy111 = _mm_maddubs_epi16(rgb10[3], yy);
 
-            __m128i y00 = _mm_add_epi16(_mm_add_epi16(_mm_mullo_epi16(r00, _mm_set1_epi16(RY)), _mm_mullo_epi16(g00, _mm_set1_epi16(GY))), _mm_mullo_epi16(b00, _mm_set1_epi16(BY)));
-            __m128i y01 = _mm_add_epi16(_mm_add_epi16(_mm_mullo_epi16(r01, _mm_set1_epi16(RY)), _mm_mullo_epi16(g01, _mm_set1_epi16(GY))), _mm_mullo_epi16(b01, _mm_set1_epi16(BY)));
-            __m128i y10 = _mm_add_epi16(_mm_add_epi16(_mm_mullo_epi16(r10, _mm_set1_epi16(RY)), _mm_mullo_epi16(g10, _mm_set1_epi16(GY))), _mm_mullo_epi16(b10, _mm_set1_epi16(BY)));
-            __m128i y11 = _mm_add_epi16(_mm_add_epi16(_mm_mullo_epi16(r11, _mm_set1_epi16(RY)), _mm_mullo_epi16(g11, _mm_set1_epi16(GY))), _mm_mullo_epi16(b11, _mm_set1_epi16(BY)));
-            y00 = _mm_srli_epi16(y00, 8);
-            y01 = _mm_srli_epi16(y01, 8);
-            y10 = _mm_srli_epi16(y10, 8);
-            y11 = _mm_srli_epi16(y11, 8);
+            __m128i y00 = _mm_packs_epi32(_mm_madd_epi16(yy000, _mm_set1_epi16(1)), _mm_madd_epi16(yy001, _mm_set1_epi16(1)));
+            __m128i y01 = _mm_packs_epi32(_mm_madd_epi16(yy010, _mm_set1_epi16(1)), _mm_madd_epi16(yy011, _mm_set1_epi16(1)));
+            __m128i y10 = _mm_packs_epi32(_mm_madd_epi16(yy100, _mm_set1_epi16(1)), _mm_madd_epi16(yy101, _mm_set1_epi16(1)));
+            __m128i y11 = _mm_packs_epi32(_mm_madd_epi16(yy110, _mm_set1_epi16(1)), _mm_madd_epi16(yy111, _mm_set1_epi16(1)));
+#else
+            __m128i yy = _mm_setr_epi16(RY >> 1, GY >> 1, BY >> 1, 0, RY >> 1, GY >> 1, BY >> 1, 0);
+            __m128i yy000 = _mm_packs_epi32(_mm_madd_epi16(rgb000[0], yy), _mm_madd_epi16(rgb000[1], yy));
+            __m128i yy001 = _mm_packs_epi32(_mm_madd_epi16(rgb000[2], yy), _mm_madd_epi16(rgb000[3], yy));
+            __m128i yy010 = _mm_packs_epi32(_mm_madd_epi16(rgb000[4], yy), _mm_madd_epi16(rgb000[5], yy));
+            __m128i yy011 = _mm_packs_epi32(_mm_madd_epi16(rgb000[6], yy), _mm_madd_epi16(rgb000[7], yy));
+            __m128i yy100 = _mm_packs_epi32(_mm_madd_epi16(rgb100[0], yy), _mm_madd_epi16(rgb100[1], yy));
+            __m128i yy101 = _mm_packs_epi32(_mm_madd_epi16(rgb100[2], yy), _mm_madd_epi16(rgb100[3], yy));
+            __m128i yy110 = _mm_packs_epi32(_mm_madd_epi16(rgb100[4], yy), _mm_madd_epi16(rgb100[5], yy));
+            __m128i yy111 = _mm_packs_epi32(_mm_madd_epi16(rgb100[6], yy), _mm_madd_epi16(rgb100[7], yy));
+
+            __m128i y00 = _mm_packs_epi32(_mm_madd_epi16(yy000, _mm_set1_epi16(1)), _mm_madd_epi16(yy001, _mm_set1_epi16(1)));
+            __m128i y01 = _mm_packs_epi32(_mm_madd_epi16(yy010, _mm_set1_epi16(1)), _mm_madd_epi16(yy011, _mm_set1_epi16(1)));
+            __m128i y10 = _mm_packs_epi32(_mm_madd_epi16(yy100, _mm_set1_epi16(1)), _mm_madd_epi16(yy101, _mm_set1_epi16(1)));
+            __m128i y11 = _mm_packs_epi32(_mm_madd_epi16(yy110, _mm_set1_epi16(1)), _mm_madd_epi16(yy111, _mm_set1_epi16(1)));
+#endif
+            y00 = _mm_srli_epi16(y00, 7);
+            y01 = _mm_srli_epi16(y01, 7);
+            y10 = _mm_srli_epi16(y10, 7);
+            y11 = _mm_srli_epi16(y11, 7);
             if (fullRange == false)
             {
                 y00 = _mm_add_epi16(y00, _mm_set1_epi16(16));
@@ -216,21 +228,76 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
             __m128i y000 = _mm_packus_epi16(y00, y01);
             __m128i y100 = _mm_packus_epi16(y10, y11);
 
-            __m128i r000 = _mm_avg_epu8(rgb00[iR], rgb10[iR]);
-            __m128i g000 = _mm_avg_epu8(rgb00[iG], rgb10[iG]);
-            __m128i b000 = _mm_avg_epu8(rgb00[iB], rgb10[iB]);
-            r000 = _mm_add_epi16(_mm_and_si128(r000, _mm_set1_epi16(0xFF)), _mm_srli_epi16(r000, 8));
-            g000 = _mm_add_epi16(_mm_and_si128(g000, _mm_set1_epi16(0xFF)), _mm_srli_epi16(g000, 8));
-            b000 = _mm_add_epi16(_mm_and_si128(b000, _mm_set1_epi16(0xFF)), _mm_srli_epi16(b000, 8));
+#if defined(__SSSE3__)
+            __m128i uv00 = _mm_avg_epu8(rgb00[0], rgb10[0]);
+            __m128i uv01 = _mm_avg_epu8(rgb00[1], rgb10[1]);
+            __m128i uv10 = _mm_avg_epu8(rgb00[2], rgb10[2]);
+            __m128i uv11 = _mm_avg_epu8(rgb00[3], rgb10[3]);
+            __m128i uv0 = _mm_avg_epu8(_mm_shuffle_ps(uv00, uv01, _MM_SHUFFLE(2,0,2,0)), _mm_shuffle_ps(uv00, uv01, _MM_SHUFFLE(3,1,3,1)));
+            __m128i uv1 = _mm_avg_epu8(_mm_shuffle_ps(uv10, uv11, _MM_SHUFFLE(2,0,2,0)), _mm_shuffle_ps(uv10, uv11, _MM_SHUFFLE(3,1,3,1)));
 
-            __m128i u00 = _mm_add_epi16(_mm_add_epi16(_mm_mullo_epi16(r000, _mm_set1_epi16(RU >> 1)), _mm_mullo_epi16(g000, _mm_set1_epi16(GU >> 1))), _mm_mullo_epi16(b000, _mm_set1_epi16(BU >> 1)));
-            __m128i v00 = _mm_add_epi16(_mm_add_epi16(_mm_mullo_epi16(r000, _mm_set1_epi16(RV >> 1)), _mm_mullo_epi16(g000, _mm_set1_epi16(GV >> 1))), _mm_mullo_epi16(b000, _mm_set1_epi16(BV >> 1)));
+            __m128i uu = _mm_setr_epi8(RU >> 1, GU >> 1, BU >> 1, 0, RU >> 1, GU >> 1, BU >> 1, 0, RU >> 1, GU >> 1, BU >> 1, 0, RU >> 1, GU >> 1, BU >> 1, 0);
+            __m128i vv = _mm_setr_epi8(RV >> 1, GV >> 1, BV >> 1, 0, RV >> 1, GV >> 1, BV >> 1, 0, RV >> 1, GV >> 1, BV >> 1, 0, RV >> 1, GV >> 1, BV >> 1, 0);
+            __m128i uu00 = _mm_maddubs_epi16(uv0, uu);
+            __m128i uu01 = _mm_maddubs_epi16(uv1, uu);
+            __m128i vv00 = _mm_maddubs_epi16(uv0, vv);
+            __m128i vv01 = _mm_maddubs_epi16(uv1, vv);
+            __m128i u00 = _mm_packs_epi32(_mm_madd_epi16(uu00, _mm_set1_epi16(1)), _mm_madd_epi16(uu01, _mm_set1_epi16(1)));
+            __m128i v00 = _mm_packs_epi32(_mm_madd_epi16(vv00, _mm_set1_epi16(1)), _mm_madd_epi16(vv01, _mm_set1_epi16(1)));
+            u00 = _mm_srai_epi16(u00, 7);
+            v00 = _mm_srai_epi16(v00, 7);
+            u00 = _mm_add_epi16(u00, _mm_set1_epi16(128));
+            v00 = _mm_add_epi16(v00, _mm_set1_epi16(128));
+            u00 = _mm_packus_epi16(u00, __m128());
+            v00 = _mm_packus_epi16(v00, __m128());
+#else
+            __m128i rgb000[8];
+            __m128i rgb100[8];
+            rgb000[0] = _mm_unpacklo_epi8(rgb00[0], __m128i());
+            rgb000[1] = _mm_unpackhi_epi8(rgb00[0], __m128i());
+            rgb000[2] = _mm_unpacklo_epi8(rgb00[1], __m128i());
+            rgb000[3] = _mm_unpackhi_epi8(rgb00[1], __m128i());
+            rgb000[4] = _mm_unpacklo_epi8(rgb00[2], __m128i());
+            rgb000[5] = _mm_unpackhi_epi8(rgb00[2], __m128i());
+            rgb000[6] = _mm_unpacklo_epi8(rgb00[3], __m128i());
+            rgb000[7] = _mm_unpackhi_epi8(rgb00[3], __m128i());
+            rgb100[0] = _mm_unpacklo_epi8(rgb10[0], __m128i());
+            rgb100[1] = _mm_unpackhi_epi8(rgb10[0], __m128i());
+            rgb100[2] = _mm_unpacklo_epi8(rgb10[1], __m128i());
+            rgb100[3] = _mm_unpackhi_epi8(rgb10[1], __m128i());
+            rgb100[4] = _mm_unpacklo_epi8(rgb10[2], __m128i());
+            rgb100[5] = _mm_unpackhi_epi8(rgb10[2], __m128i());
+            rgb100[6] = _mm_unpacklo_epi8(rgb10[3], __m128i());
+            rgb100[7] = _mm_unpackhi_epi8(rgb10[3], __m128i());
+
+            __m128i uv00 = _mm_add_epi16(_mm_shuffle_ps(rgb000[0], rgb000[1], _MM_SHUFFLE(3,2,1,0)), _mm_shuffle_ps(rgb000[1], rgb000[0], _MM_SHUFFLE(1,0,3,2)));
+            __m128i uv01 = _mm_add_epi16(_mm_shuffle_ps(rgb000[2], rgb000[3], _MM_SHUFFLE(3,2,1,0)), _mm_shuffle_ps(rgb000[5], rgb000[2], _MM_SHUFFLE(1,0,3,2)));
+            __m128i uv02 = _mm_add_epi16(_mm_shuffle_ps(rgb000[4], rgb000[5], _MM_SHUFFLE(3,2,1,0)), _mm_shuffle_ps(rgb000[3], rgb000[4], _MM_SHUFFLE(1,0,3,2)));
+            __m128i uv03 = _mm_add_epi16(_mm_shuffle_ps(rgb000[6], rgb000[7], _MM_SHUFFLE(3,2,1,0)), _mm_shuffle_ps(rgb000[7], rgb000[6], _MM_SHUFFLE(1,0,3,2)));
+            __m128i uv10 = _mm_add_epi16(_mm_shuffle_ps(rgb100[0], rgb100[1], _MM_SHUFFLE(3,2,1,0)), _mm_shuffle_ps(rgb100[1], rgb100[0], _MM_SHUFFLE(1,0,3,2)));
+            __m128i uv11 = _mm_add_epi16(_mm_shuffle_ps(rgb100[2], rgb100[3], _MM_SHUFFLE(3,2,1,0)), _mm_shuffle_ps(rgb100[3], rgb100[2], _MM_SHUFFLE(1,0,3,2)));
+            __m128i uv12 = _mm_add_epi16(_mm_shuffle_ps(rgb100[4], rgb100[5], _MM_SHUFFLE(3,2,1,0)), _mm_shuffle_ps(rgb100[5], rgb100[4], _MM_SHUFFLE(1,0,3,2)));
+            __m128i uv13 = _mm_add_epi16(_mm_shuffle_ps(rgb100[6], rgb100[7], _MM_SHUFFLE(3,2,1,0)), _mm_shuffle_ps(rgb100[7], rgb100[6], _MM_SHUFFLE(1,0,3,2)));
+            __m128i uv0 = _mm_add_epi16(uv00, uv10);
+            __m128i uv1 = _mm_add_epi16(uv01, uv11);
+            __m128i uv2 = _mm_add_epi16(uv02, uv12);
+            __m128i uv3 = _mm_add_epi16(uv03, uv13);
+
+            __m128i uu = _mm_setr_epi16(RU >> 2, GU >> 2, BU >> 2, 0, RU >> 2, GU >> 2, BU >> 2, 0);
+            __m128i vv = _mm_setr_epi16(RV >> 2, GV >> 2, BV >> 2, 0, RV >> 2, GV >> 2, BV >> 2, 0);
+            __m128i uu00 = _mm_packs_epi32(_mm_madd_epi16(uv0, uu), _mm_madd_epi16(uv1, uu));
+            __m128i uu01 = _mm_packs_epi32(_mm_madd_epi16(uv2, uu), _mm_madd_epi16(uv3, uu));
+            __m128i vv00 = _mm_packs_epi32(_mm_madd_epi16(uv0, vv), _mm_madd_epi16(uv1, vv));
+            __m128i vv01 = _mm_packs_epi32(_mm_madd_epi16(uv2, vv), _mm_madd_epi16(uv3, vv));
+            __m128i u00 = _mm_packs_epi32(_mm_madd_epi16(uu00, _mm_set1_epi16(1)), _mm_madd_epi16(uu01, _mm_set1_epi16(1)));
+            __m128i v00 = _mm_packs_epi32(_mm_madd_epi16(vv00, _mm_set1_epi16(1)), _mm_madd_epi16(vv01, _mm_set1_epi16(1)));
             u00 = _mm_srai_epi16(u00, 8);
             v00 = _mm_srai_epi16(v00, 8);
             u00 = _mm_add_epi16(u00, _mm_set1_epi16(128));
             v00 = _mm_add_epi16(v00, _mm_set1_epi16(128));
             u00 = _mm_packus_epi16(u00, __m128());
             v00 = _mm_packus_epi16(v00, __m128());
+#endif
 
             _mm_storeu_si128((__m128i*)y0, y000); y0 += 16;
             _mm_storeu_si128((__m128i*)y1, y100); y1 += 16;
