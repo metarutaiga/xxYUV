@@ -115,15 +115,15 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
     int Y, UG, UB, VR, VG;
     if (fullRange)
     {
-        Y = (int)(fY * 256);
-        UG = (int)(fUG * 256); UB = (int)(fUB * 256);
-        VR = (int)(fVR * 256); VG = (int)(fVG * 256);
+        Y = (int)(fY * 255);
+        UG = (int)(fUG * 255); UB = (int)(fUB * 255);
+        VR = (int)(fVR * 255); VG = (int)(fVG * 255);
     }
     else
     {
-        Y = (int)(vY * 256);
-        UG = (int)(vUG * 256); UB = (int)(vUB * 256);
-        VR = (int)(vVR * 256); VG = (int)(vVG * 256);
+        Y = (int)(vY * 255);
+        UG = (int)(vUG * 255); UB = (int)(vUB * 255);
+        VR = (int)(vVR * 255); VG = (int)(vVG * 255);
     }
 
     for (int h = 0; h < halfHeight; ++h)
