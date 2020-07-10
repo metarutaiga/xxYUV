@@ -8,25 +8,6 @@
 #   include <arm_neon.h>
 #elif defined(_M_IX86) || defined(_M_AMD64) || defined(__i386__) || defined(__amd64__)
 #   include <immintrin.h>
-#   define _MM_DEINTERLACE4_EPI8(R0, R1, R2, R3) {  \
-        __m128i T0, T1, T2, T3;                     \
-        T0 = _mm_unpacklo_epi8(R0, R1);             \
-        T1 = _mm_unpacklo_epi8(R2, R3);             \
-        T2 = _mm_unpackhi_epi8(R0, R1);             \
-        T3 = _mm_unpackhi_epi8(R2, R3);             \
-        R0 = _mm_unpacklo_epi8(T0, T2);             \
-        R1 = _mm_unpackhi_epi8(T0, T2);             \
-        R2 = _mm_unpacklo_epi8(T1, T3);             \
-        R3 = _mm_unpackhi_epi8(T1, T3);             \
-        T0 = _mm_unpacklo_epi32(R0, R2);            \
-        T1 = _mm_unpackhi_epi32(R0, R2);            \
-        T2 = _mm_unpacklo_epi32(R1, R3);            \
-        T3 = _mm_unpackhi_epi32(R1, R3);            \
-        R0 = _mm_unpacklo_epi8(T0, T2);             \
-        R1 = _mm_unpackhi_epi8(T0, T2);             \
-        R2 = _mm_unpacklo_epi8(T1, T3);             \
-        R3 = _mm_unpackhi_epi8(T1, T3);             \
-    }
 #endif
 #include "rgb2yuv.h"
 
