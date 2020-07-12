@@ -155,6 +155,103 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
         }
         if (rgbWidth == 4)
             continue;
+#elif defined(__AVX2__)
+        int halfWidth16 = (rgbWidth == 4) ? halfWidth / 16 : 0;
+        for (int w = 0; w < halfWidth16; ++w)
+        {
+            __m256i rgb00[4] = { _mm256_loadu_si256((__m256i*)rgb0), _mm256_loadu_si256((__m256i*)rgb0 + 1), _mm256_loadu_si256((__m256i*)rgb0 + 2), _mm256_loadu_si256((__m256i*)rgb0 + 3) };  rgb0 += 32 * 4;
+            __m256i rgb10[4] = { _mm256_loadu_si256((__m256i*)rgb1), _mm256_loadu_si256((__m256i*)rgb1 + 1), _mm256_loadu_si256((__m256i*)rgb1 + 2), _mm256_loadu_si256((__m256i*)rgb1 + 3) };  rgb1 += 32 * 4;
+
+            __m256i yy = _mm256_setr_epi8(Y[0] >> 1, Y[1] >> 1, Y[2] >> 1, 0,
+                                          Y[0] >> 1, Y[1] >> 1, Y[2] >> 1, 0,
+                                          Y[0] >> 1, Y[1] >> 1, Y[2] >> 1, 0,
+                                          Y[0] >> 1, Y[1] >> 1, Y[2] >> 1, 0,
+                                          Y[0] >> 1, Y[1] >> 1, Y[2] >> 1, 0,
+                                          Y[0] >> 1, Y[1] >> 1, Y[2] >> 1, 0,
+                                          Y[0] >> 1, Y[1] >> 1, Y[2] >> 1, 0,
+                                          Y[0] >> 1, Y[1] >> 1, Y[2] >> 1, 0);
+            __m256i yy000 = _mm256_maddubs_epi16(rgb00[0], yy);
+            __m256i yy001 = _mm256_maddubs_epi16(rgb00[1], yy);
+            __m256i yy010 = _mm256_maddubs_epi16(rgb00[2], yy);
+            __m256i yy011 = _mm256_maddubs_epi16(rgb00[3], yy);
+            __m256i yy100 = _mm256_maddubs_epi16(rgb10[0], yy);
+            __m256i yy101 = _mm256_maddubs_epi16(rgb10[1], yy);
+            __m256i yy110 = _mm256_maddubs_epi16(rgb10[2], yy);
+            __m256i yy111 = _mm256_maddubs_epi16(rgb10[3], yy);
+            __m256i y00 = _mm256_hadd_epi16(yy000, yy001);
+            __m256i y01 = _mm256_hadd_epi16(yy010, yy011);
+            __m256i y10 = _mm256_hadd_epi16(yy100, yy101);
+            __m256i y11 = _mm256_hadd_epi16(yy110, yy111);
+            y00 = _mm256_srli_epi16(y00, 7);
+            y01 = _mm256_srli_epi16(y01, 7);
+            y10 = _mm256_srli_epi16(y10, 7);
+            y11 = _mm256_srli_epi16(y11, 7);
+            __m256i y000 = _mm256_permutevar8x32_epi32(_mm256_packus_epi16(y00, y01), _mm256_setr_epi32(0,4,1,5,2,6,3,7));
+            __m256i y100 = _mm256_permutevar8x32_epi32(_mm256_packus_epi16(y10, y11), _mm256_setr_epi32(0,4,1,5,2,6,3,7));
+            if (fullRange == false)
+            {
+                y000 = _mm256_adds_epu8(y000, _mm256_set1_epi8(16));
+                y100 = _mm256_adds_epu8(y100, _mm256_set1_epi8(16));
+            }
+
+            __m256i uv00 = _mm256_avg_epu8(rgb00[0], rgb10[0]);
+            __m256i uv01 = _mm256_avg_epu8(rgb00[1], rgb10[1]);
+            __m256i uv10 = _mm256_avg_epu8(rgb00[2], rgb10[2]);
+            __m256i uv11 = _mm256_avg_epu8(rgb00[3], rgb10[3]);
+            __m256i uv0 = _mm256_avg_epu8(_mm256_shuffle_ps(uv00, uv01, _MM_SHUFFLE(2,0,2,0)), _mm256_shuffle_ps(uv00, uv01, _MM_SHUFFLE(3,1,3,1)));
+            __m256i uv1 = _mm256_avg_epu8(_mm256_shuffle_ps(uv10, uv11, _MM_SHUFFLE(2,0,2,0)), _mm256_shuffle_ps(uv10, uv11, _MM_SHUFFLE(3,1,3,1)));
+            __m256i uu = _mm256_setr_epi8(U[0], U[1], U[2], 0,
+                                          U[0], U[1], U[2], 0,
+                                          U[0], U[1], U[2], 0,
+                                          U[0], U[1], U[2], 0,
+                                          U[0], U[1], U[2], 0,
+                                          U[0], U[1], U[2], 0,
+                                          U[0], U[1], U[2], 0,
+                                          U[0], U[1], U[2], 0);
+            __m256i vv = _mm256_setr_epi8(V[0], V[1], V[2], 0,
+                                          V[0], V[1], V[2], 0,
+                                          V[0], V[1], V[2], 0,
+                                          V[0], V[1], V[2], 0,
+                                          V[0], V[1], V[2], 0,
+                                          V[0], V[1], V[2], 0,
+                                          V[0], V[1], V[2], 0,
+                                          V[0], V[1], V[2], 0);
+            __m256i uu00 = _mm256_maddubs_epi16(uv0, uu);
+            __m256i uu01 = _mm256_maddubs_epi16(uv1, uu);
+            __m256i vv00 = _mm256_maddubs_epi16(uv0, vv);
+            __m256i vv01 = _mm256_maddubs_epi16(uv1, vv);
+            __m256i u00 = _mm256_hadd_epi16(uu00, uu01);
+            __m256i v00 = _mm256_hadd_epi16(vv00, vv01);
+            u00 = _mm256_srai_epi16(u00, 8);
+            v00 = _mm256_srai_epi16(v00, 8);
+            u00 = _mm256_permutevar8x32_epi32(_mm256_packs_epi16(u00, __m256i()), _mm256_setr_epi32(0,4,1,5,2,6,3,7));
+            v00 = _mm256_permutevar8x32_epi32(_mm256_packs_epi16(v00, __m256i()), _mm256_setr_epi32(0,4,1,5,2,6,3,7));
+            u00 = _mm256_sub_epi8(u00, _mm256_set1_epi8(-128));
+            v00 = _mm256_sub_epi8(v00, _mm256_set1_epi8(-128));
+
+            _mm256_storeu_si256((__m256i*)y0, y000); y0 += 32;
+            _mm256_storeu_si256((__m256i*)y1, y100); y1 += 32;
+            if (interleaved)
+            {
+                if (firstU)
+                {
+                    __m256i uv00 = _mm256_unpacklo_epi8(u00, v00);
+                    _mm_storeu_si128((__m128i*)u0, _mm256_castsi256_si128(uv00)); u0 += 32;
+                }
+                else
+                {
+                    __m256i uv00 = _mm256_unpacklo_epi8(v00, u00);
+                    _mm_storeu_si128((__m128i*)v0, _mm256_castsi256_si128(uv00)); v0 += 32;
+                }
+            }
+            else
+            {
+                _mm_storeu_si128((__m128i*)u0, _mm256_castsi256_si128(u00)); u0 += 16;
+                _mm_storeu_si128((__m128i*)v0, _mm256_castsi256_si128(v00)); v0 += 16;
+            }
+        }
+        if (rgbWidth == 4)
+            continue;
 #elif defined(_M_IX86) || defined(_M_AMD64) || defined(__i386__) || defined(__amd64__)
         int halfWidth8 = (rgbWidth == 4) ? halfWidth / 8 : 0;
         for (int w = 0; w < halfWidth8; ++w)
