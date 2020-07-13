@@ -224,25 +224,27 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
             __m256i vv02 = _mm256_hadd_epi16(vv00, vv01);
             uu02 = _mm256_srai_epi16(uu02, 8);
             vv02 = _mm256_srai_epi16(vv02, 8);
-            __m256i uv02 = _mm256_permutevar8x32_epi32(_mm256_packus_epi16(uu02, vv02), _mm256_setr_epi32(0,4,1,5,2,6,3,7));
+            __m256i mask = _mm256_setr_epi8(0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15,
+                                            0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15);
+            __m256i uv02 = _mm256_shuffle_epi8(_mm256_permute4x64_epi64(_mm256_packs_epi16(uu02, vv02), _MM_SHUFFLE(3,1,2,0)), mask);
             __m128i u00 = _mm256_extractf128_si256(uv02, 0);
             __m128i v00 = _mm256_extractf128_si256(uv02, 1);
             u00 = _mm_sub_epi8(u00, _mm_set1_epi8(-128));
             v00 = _mm_sub_epi8(v00, _mm_set1_epi8(-128));
 
-            _mm256_storeu_si256((__m256i*)y0, __m256i()); y0 += 32;
-            _mm256_storeu_si256((__m256i*)y1, __m256i()); y1 += 32;
+            _mm256_storeu_si256((__m256i*)y0, y000); y0 += 32;
+            _mm256_storeu_si256((__m256i*)y1, y100); y1 += 32;
             if (interleaved)
             {
                 if (firstU)
                 {
-                    __m128i uv00 = _mm_unpacklo_epi8(u00, v00);
-                    _mm_storeu_si128((__m128i*)u0, uv00); u0 += 32;
+                    __m256i uv00 = _mm256_setr_m128i(_mm_unpacklo_epi8(u00, v00), _mm_unpackhi_epi8(u00, v00));
+                    _mm256_storeu_si256((__m256i*)u0, uv00); u0 += 32;
                 }
                 else
                 {
-                    __m128i uv00 = _mm_unpacklo_epi8(v00, u00);
-                    _mm_storeu_si128((__m128i*)v0, uv00); v0 += 32;
+                    __m256i uv00 = _mm256_setr_m128i(_mm_unpacklo_epi8(v00, u00), _mm_unpackhi_epi8(v00, u00));
+                    _mm256_storeu_si256((__m256i*)v0, uv00); v0 += 32;
                 }
             }
             else
