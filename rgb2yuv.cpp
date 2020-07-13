@@ -220,34 +220,35 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
             __m256i uu01 = _mm256_maddubs_epi16(uv1, uu);
             __m256i vv00 = _mm256_maddubs_epi16(uv0, vv);
             __m256i vv01 = _mm256_maddubs_epi16(uv1, vv);
-            __m256i u00 = _mm256_hadd_epi16(uu00, uu01);
-            __m256i v00 = _mm256_hadd_epi16(vv00, vv01);
-            u00 = _mm256_srai_epi16(u00, 8);
-            v00 = _mm256_srai_epi16(v00, 8);
-            u00 = _mm256_permutevar8x32_epi32(_mm256_packs_epi16(u00, __m256i()), _mm256_setr_epi32(0,4,1,5,2,6,3,7));
-            v00 = _mm256_permutevar8x32_epi32(_mm256_packs_epi16(v00, __m256i()), _mm256_setr_epi32(0,4,1,5,2,6,3,7));
-            u00 = _mm256_sub_epi8(u00, _mm256_set1_epi8(-128));
-            v00 = _mm256_sub_epi8(v00, _mm256_set1_epi8(-128));
+            __m256i uu02 = _mm256_hadd_epi16(uu00, uu01);
+            __m256i vv02 = _mm256_hadd_epi16(vv00, vv01);
+            uu02 = _mm256_srai_epi16(uu02, 8);
+            vv02 = _mm256_srai_epi16(vv02, 8);
+            __m256i uv02 = _mm256_permutevar8x32_epi32(_mm256_packus_epi16(uu02, vv02), _mm256_setr_epi32(0,4,1,5,2,6,3,7));
+            __m128i u00 = _mm256_extractf128_si256(uv02, 0);
+            __m128i v00 = _mm256_extractf128_si256(uv02, 1);
+            u00 = _mm_sub_epi8(u00, _mm_set1_epi8(-128));
+            v00 = _mm_sub_epi8(v00, _mm_set1_epi8(-128));
 
-            _mm256_storeu_si256((__m256i*)y0, y000); y0 += 32;
-            _mm256_storeu_si256((__m256i*)y1, y100); y1 += 32;
+            _mm256_storeu_si256((__m256i*)y0, __m256i()); y0 += 32;
+            _mm256_storeu_si256((__m256i*)y1, __m256i()); y1 += 32;
             if (interleaved)
             {
                 if (firstU)
                 {
-                    __m256i uv00 = _mm256_unpacklo_epi8(u00, v00);
-                    _mm_storeu_si128((__m128i*)u0, _mm256_castsi256_si128(uv00)); u0 += 32;
+                    __m128i uv00 = _mm_unpacklo_epi8(u00, v00);
+                    _mm_storeu_si128((__m128i*)u0, uv00); u0 += 32;
                 }
                 else
                 {
-                    __m256i uv00 = _mm256_unpacklo_epi8(v00, u00);
-                    _mm_storeu_si128((__m128i*)v0, _mm256_castsi256_si128(uv00)); v0 += 32;
+                    __m128i uv00 = _mm_unpacklo_epi8(v00, u00);
+                    _mm_storeu_si128((__m128i*)v0, uv00); v0 += 32;
                 }
             }
             else
             {
-                _mm_storeu_si128((__m128i*)u0, _mm256_castsi256_si128(u00)); u0 += 16;
-                _mm_storeu_si128((__m128i*)v0, _mm256_castsi256_si128(v00)); v0 += 16;
+                _mm_storeu_si128((__m128i*)u0, u00); u0 += 16;
+                _mm_storeu_si128((__m128i*)v0, v00); v0 += 16;
             }
         }
         if (rgbWidth == 4)
@@ -260,7 +261,10 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
             __m128i rgb10[4] = { _mm_loadu_si128((__m128i*)rgb1), _mm_loadu_si128((__m128i*)rgb1 + 1), _mm_loadu_si128((__m128i*)rgb1 + 2), _mm_loadu_si128((__m128i*)rgb1 + 3) };  rgb1 += 16 * 4;
 
 #if defined(__SSSE3__)
-            __m128i yy = _mm_setr_epi8(Y[0] >> 1, Y[1] >> 1, Y[2] >> 1, 0, Y[0] >> 1, Y[1] >> 1, Y[2] >> 1, 0, Y[0] >> 1, Y[1] >> 1, Y[2] >> 1, 0, Y[0] >> 1, Y[1] >> 1, Y[2] >> 1, 0);
+            __m128i yy = _mm_setr_epi8(Y[0] >> 1, Y[1] >> 1, Y[2] >> 1, 0,
+                                       Y[0] >> 1, Y[1] >> 1, Y[2] >> 1, 0,
+                                       Y[0] >> 1, Y[1] >> 1, Y[2] >> 1, 0,
+                                       Y[0] >> 1, Y[1] >> 1, Y[2] >> 1, 0);
             __m128i yy000 = _mm_maddubs_epi16(rgb00[0], yy);
             __m128i yy001 = _mm_maddubs_epi16(rgb00[1], yy);
             __m128i yy010 = _mm_maddubs_epi16(rgb00[2], yy);
@@ -274,7 +278,8 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
             __m128i y10 = _mm_hadd_epi16(yy100, yy101);
             __m128i y11 = _mm_hadd_epi16(yy110, yy111);
 #else
-            __m128i yy = _mm_setr_epi16(Y[0] >> 1, Y[1] >> 1, Y[2] >> 1, 0, Y[0] >> 1, Y[1] >> 1, Y[2] >> 1, 0);
+            __m128i yy = _mm_setr_epi16(Y[0] >> 1, Y[1] >> 1, Y[2] >> 1, 0,
+                                        Y[0] >> 1, Y[1] >> 1, Y[2] >> 1, 0);
             __m128i yy000 = _mm_packs_epi32(_mm_madd_epi16(_mm_unpacklo_epi8(rgb00[0], __m128i()), yy), _mm_madd_epi16(_mm_unpackhi_epi8(rgb00[0], __m128i()), yy));
             __m128i yy001 = _mm_packs_epi32(_mm_madd_epi16(_mm_unpacklo_epi8(rgb00[1], __m128i()), yy), _mm_madd_epi16(_mm_unpackhi_epi8(rgb00[1], __m128i()), yy));
             __m128i yy010 = _mm_packs_epi32(_mm_madd_epi16(_mm_unpacklo_epi8(rgb00[2], __m128i()), yy), _mm_madd_epi16(_mm_unpackhi_epi8(rgb00[2], __m128i()), yy));
@@ -307,8 +312,14 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
             __m128i uv0 = _mm_avg_epu8(_mm_shuffle_ps(uv00, uv01, _MM_SHUFFLE(2,0,2,0)), _mm_shuffle_ps(uv00, uv01, _MM_SHUFFLE(3,1,3,1)));
             __m128i uv1 = _mm_avg_epu8(_mm_shuffle_ps(uv10, uv11, _MM_SHUFFLE(2,0,2,0)), _mm_shuffle_ps(uv10, uv11, _MM_SHUFFLE(3,1,3,1)));
 #if defined(__SSSE3__)
-            __m128i uu = _mm_setr_epi8(U[0], U[1], U[2], 0, U[0], U[1], U[2], 0, U[0], U[1], U[2], 0, U[0], U[1], U[2], 0);
-            __m128i vv = _mm_setr_epi8(V[0], V[1], V[2], 0, V[0], V[1], V[2], 0, V[0], V[1], V[2], 0, V[0], V[1], V[2], 0);
+            __m128i uu = _mm_setr_epi8(U[0], U[1], U[2], 0,
+                                       U[0], U[1], U[2], 0,
+                                       U[0], U[1], U[2], 0,
+                                       U[0], U[1], U[2], 0);
+            __m128i vv = _mm_setr_epi8(V[0], V[1], V[2], 0,
+                                       V[0], V[1], V[2], 0,
+                                       V[0], V[1], V[2], 0,
+                                       V[0], V[1], V[2], 0);
             __m128i uu00 = _mm_maddubs_epi16(uv0, uu);
             __m128i uu01 = _mm_maddubs_epi16(uv1, uu);
             __m128i vv00 = _mm_maddubs_epi16(uv0, vv);
@@ -316,8 +327,10 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
             __m128i u00 = _mm_hadd_epi16(uu00, uu01);
             __m128i v00 = _mm_hadd_epi16(vv00, vv01);
 #else
-            __m128i uu = _mm_setr_epi16(U[0], U[1], U[2], 0, U[0], U[1], U[2], 0);
-            __m128i vv = _mm_setr_epi16(V[0], V[1], V[2], 0, V[0], V[1], V[2], 0);
+            __m128i uu = _mm_setr_epi16(U[0], U[1], U[2], 0,
+                                        U[0], U[1], U[2], 0);
+            __m128i vv = _mm_setr_epi16(V[0], V[1], V[2], 0,
+                                        V[0], V[1], V[2], 0);
             __m128i uu00 = _mm_packs_epi32(_mm_madd_epi16(_mm_unpacklo_epi8(uv0, __m128()), uu), _mm_madd_epi16(_mm_unpackhi_epi8(uv0, __m128()), uu));
             __m128i uu01 = _mm_packs_epi32(_mm_madd_epi16(_mm_unpacklo_epi8(uv1, __m128()), uu), _mm_madd_epi16(_mm_unpackhi_epi8(uv1, __m128()), uu));
             __m128i vv00 = _mm_packs_epi32(_mm_madd_epi16(_mm_unpacklo_epi8(uv0, __m128()), vv), _mm_madd_epi16(_mm_unpackhi_epi8(uv0, __m128()), vv));
