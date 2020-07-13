@@ -227,15 +227,14 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
             __m256i mask = _mm256_setr_epi8(0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15,
                                             0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15);
             __m256i uv02 = _mm256_shuffle_epi8(_mm256_permute4x64_epi64(_mm256_packs_epi16(uu02, vv02), _MM_SHUFFLE(3,1,2,0)), mask);
-            __m128i u00 = _mm256_extractf128_si256(uv02, 0);
-            __m128i v00 = _mm256_extractf128_si256(uv02, 1);
-            u00 = _mm_sub_epi8(u00, _mm_set1_epi8(-128));
-            v00 = _mm_sub_epi8(v00, _mm_set1_epi8(-128));
+            uv02 = _mm256_sub_epi8(uv02, _mm256_set1_epi8(-128));
 
             _mm256_storeu_si256((__m256i*)y0, y000); y0 += 32;
             _mm256_storeu_si256((__m256i*)y1, y100); y1 += 32;
             if (interleaved)
             {
+                __m128i u00 = _mm256_extractf128_si256(uv02, 0);
+                __m128i v00 = _mm256_extractf128_si256(uv02, 1);
                 if (firstU)
                 {
                     __m256i uv00 = _mm256_setr_m128i(_mm_unpacklo_epi8(u00, v00), _mm_unpackhi_epi8(u00, v00));
@@ -249,8 +248,7 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
             }
             else
             {
-                _mm_storeu_si128((__m128i*)u0, u00); u0 += 16;
-                _mm_storeu_si128((__m128i*)v0, v00); v0 += 16;
+                _mm256_storeu2_m128i((__m128i*)v0, (__m128i*)u0, uv02);  u0 += 16; v0 += 16;
             }
         }
         if (rgbWidth == 4)
@@ -342,15 +340,15 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
 #endif
             u00 = _mm_srai_epi16(u00, 8);
             v00 = _mm_srai_epi16(v00, 8);
-            u00 = _mm_packs_epi16(u00, __m128());
-            v00 = _mm_packs_epi16(v00, __m128());
-            u00 = _mm_sub_epi8(u00, _mm_set1_epi8(-128));
-            v00 = _mm_sub_epi8(v00, _mm_set1_epi8(-128));
+            __m128i uv02 = _mm_packs_epi16(u00, v00);
+            uv02 = _mm_sub_epi8(uv02, _mm_set1_epi8(-128));
 
             _mm_storeu_si128((__m128i*)y0, y000); y0 += 16;
             _mm_storeu_si128((__m128i*)y1, y100); y1 += 16;
             if (interleaved)
             {
+                u00 = uv02;
+                v00 = _mm_movehl_ps(uv02, uv02);
                 if (firstU)
                 {
                     __m128i uv00 = _mm_unpacklo_epi8(u00, v00);
@@ -364,8 +362,8 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
             }
             else
             {
-                _mm_storeu_si64(u0, u00); u0 += 8;
-                _mm_storeu_si64(v0, v00); v0 += 8;
+                _mm_storel_pi((__m64*)u0, uv02);    u0 += 8;
+                _mm_storeh_pi((__m64*)v0, uv02);    v0 += 8;
             }
         }
         if (rgbWidth == 4)
