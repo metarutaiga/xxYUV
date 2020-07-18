@@ -257,20 +257,26 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
                 if (firstU)
                 {
                     __m512i uv00 = _mm512_loadu_si512((__m512i*)u0); u0 += 64;
-                    u00 = _mm512_add_epi16(_mm512_slli_epi16(uv00, 8), _mm512_set1_epi16(-32768));
-                    v00 = _mm512_add_epi16(_mm512_and_si512(uv00, _mm512_set1_epi16(0xFF00)), _mm512_set1_epi16(-32768));
+                    uv00 = _mm512_sub_epi8(uv00, _mm512_set1_epi8(-128));
+                    u00 = _mm512_slli_epi16(uv00, 8);
+                    v00 = uv00;
                 }
                 else
                 {
                     __m512i uv00 = _mm512_loadu_si512((__m512i*)v0); v0 += 64;
-                    u00 = _mm512_add_epi16(_mm512_and_si512(uv00, _mm512_set1_epi16(0xFF00)), _mm512_set1_epi16(-32768));
-                    v00 = _mm512_add_epi16(_mm512_slli_epi16(uv00, 8), _mm512_set1_epi16(-32768));
+                    uv00 = _mm512_sub_epi8(uv00, _mm512_set1_epi8(-128));
+                    u00 = uv00;
+                    v00 = _mm512_slli_epi16(uv00, 8);
                 }
             }
             else
             {
-                u00 = _mm512_add_epi16(_mm512_slli_epi16(_mm512_cvtepu8_epi16(_mm256_loadu_si256((__m256i*)u0)), 8), _mm512_set1_epi16(-32768)); u0 += 32;
-                v00 = _mm512_add_epi16(_mm512_slli_epi16(_mm512_cvtepu8_epi16(_mm256_loadu_si256((__m256i*)v0)), 8), _mm512_set1_epi16(-32768)); v0 += 32;
+                __m256i u000 = _mm256_loadu_si256((__m256i*)u0); u0 += 32;
+                __m256i v000 = _mm256_loadu_si256((__m256i*)v0); v0 += 32;
+                u000 = _mm256_sub_epi8(u000, _mm256_set1_epi8(-128));
+                v000 = _mm256_sub_epi8(v000, _mm256_set1_epi8(-128));
+                u00 = _mm512_slli_epi16(_mm512_cvtepi8_epi16(u000), 8);
+                v00 = _mm512_slli_epi16(_mm512_cvtepi8_epi16(v000), 8);
             }
 
             __m512i dR =                                                                  _mm512_mulhi_epi16(v00, _mm512_set1_epi16(VR));
@@ -343,20 +349,26 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
                 if (firstU)
                 {
                     __m256i uv00 = _mm256_loadu_si256((__m256i*)u0); u0 += 32;
-                    u00 = _mm256_add_epi16(_mm256_slli_epi16(uv00, 8), _mm256_set1_epi16(-32768));
-                    v00 = _mm256_add_epi16(_mm256_and_si256(uv00, _mm256_set1_epi16(0xFF00)), _mm256_set1_epi16(-32768));
+                    uv00 = _mm256_sub_epi8(uv00, _mm256_set1_epi8(-128));
+                    u00 = _mm256_slli_epi16(uv00, 8);
+                    v00 = uv00;
                 }
                 else
                 {
                     __m256i uv00 = _mm256_loadu_si256((__m256i*)v0); v0 += 32;
-                    u00 = _mm256_add_epi16(_mm256_and_si256(uv00, _mm256_set1_epi16(0xFF00)), _mm256_set1_epi16(-32768));
-                    v00 = _mm256_add_epi16(_mm256_slli_epi16(uv00, 8), _mm256_set1_epi16(-32768));
+                    uv00 = _mm256_sub_epi8(uv00, _mm256_set1_epi8(-128));
+                    u00 = uv00;
+                    v00 = _mm256_slli_epi16(uv00, 8);
                 }
             }
             else
             {
-                u00 = _mm256_add_epi16(_mm256_slli_epi16(_mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i*)u0)), 8), _mm256_set1_epi16(-32768)); u0 += 16;
-                v00 = _mm256_add_epi16(_mm256_slli_epi16(_mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i*)v0)), 8), _mm256_set1_epi16(-32768)); v0 += 16;
+                __m128i u000 = _mm_loadu_si128((__m128i*)u0); u0 += 16;
+                __m128i v000 = _mm_loadu_si128((__m128i*)v0); v0 += 16;
+                u000 = _mm_sub_epi8(u000, _mm_set1_epi8(-128));
+                v000 = _mm_sub_epi8(v000, _mm_set1_epi8(-128));
+                u00 = _mm256_slli_epi16(_mm256_cvtepi8_epi16(u000), 8);
+                v00 = _mm256_slli_epi16(_mm256_cvtepi8_epi16(v000), 8);
             }
 
             __m256i dR =                                                                  _mm256_mulhi_epi16(v00, _mm256_set1_epi16(VR));
@@ -429,20 +441,26 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
                 if (firstU)
                 {
                     __m128i uv00 = _mm_loadu_si128((__m128i*)u0); u0 += 16;
-                    u00 = _mm_add_epi16(_mm_slli_epi16(uv00, 8), _mm_set1_epi16(-32768));
-                    v00 = _mm_add_epi16(_mm_and_si128(uv00, _mm_set1_epi16(0xFF00)), _mm_set1_epi16(-32768));
+                    uv00 = _mm_sub_epi8(uv00, _mm_set1_epi8(-128));
+                    u00 = _mm_slli_epi16(uv00, 8);
+                    v00 = uv00;
                 }
                 else
                 {
                     __m128i uv00 = _mm_loadu_si128((__m128i*)v0); v0 += 16;
-                    u00 = _mm_add_epi16(_mm_and_si128(uv00, _mm_set1_epi16(0xFF00)), _mm_set1_epi16(-32768));
-                    v00 = _mm_add_epi16(_mm_slli_epi16(uv00, 8), _mm_set1_epi16(-32768));
+                    uv00 = _mm_sub_epi8(uv00, _mm_set1_epi8(-128));
+                    u00 = uv00;
+                    v00 = _mm_slli_epi16(uv00, 8);
                 }
             }
             else
             {
-                u00 = _mm_add_epi16(_mm_unpacklo_epi8(__m128i(), _mm_loadl_epi64((__m128i*)u0)), _mm_set1_epi16(-32768)); u0 += 8;
-                v00 = _mm_add_epi16(_mm_unpacklo_epi8(__m128i(), _mm_loadl_epi64((__m128i*)v0)), _mm_set1_epi16(-32768)); v0 += 8;
+                __m128i u000 = _mm_loadl_epi64((__m128i*)u0); u0 += 8;
+                __m128i v000 = _mm_loadl_epi64((__m128i*)v0); v0 += 8;
+                u000 = _mm_sub_epi8(u000, _mm_set1_epi8(-128));
+                v000 = _mm_sub_epi8(v000, _mm_set1_epi8(-128));
+                u00 = _mm_unpacklo_epi8(__m128i(), u000);
+                v00 = _mm_unpacklo_epi8(__m128i(), v000);
             }
 
             __m128i dR =                                                         _mm_mulhi_epi16(v00, _mm_set1_epi16(VR));
