@@ -67,15 +67,15 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
     int Y[3], U[3], V[3];
     if (fullRange)
     {
-        Y[iR] = (int)(fRY * 255); U[iR] = (int)(fRU * 255); V[iR] = (int)(fRV * 255);
-        Y[iG] = (int)(fGY * 255); U[iG] = (int)(fGU * 255); V[iG] = (int)(fGV * 255);
-        Y[iB] = (int)(fBY * 255); U[iB] = (int)(fBU * 255); V[iB] = (int)(fBV * 255);
+        Y[iR] = (int)(fRY * 256); U[iR] = (int)(fRU * 255); V[iR] = (int)(fRV * 255);
+        Y[iG] = (int)(fGY * 256); U[iG] = (int)(fGU * 255); V[iG] = (int)(fGV * 255);
+        Y[iB] = (int)(fBY * 256); U[iB] = (int)(fBU * 255); V[iB] = (int)(fBV * 255);
     }
     else
     {
-        Y[iR] = (int)(vRY * 255); U[iR] = (int)(vRU * 255); V[iR] = (int)(vRV * 255);
-        Y[iG] = (int)(vGY * 255); U[iG] = (int)(vGU * 255); V[iG] = (int)(vGV * 255);
-        Y[iB] = (int)(vBY * 255); U[iB] = (int)(vBU * 255); V[iB] = (int)(vBV * 255);
+        Y[iR] = (int)(vRY * 256); U[iR] = (int)(vRU * 255); V[iR] = (int)(vRV * 255);
+        Y[iG] = (int)(vGY * 256); U[iG] = (int)(vGU * 255); V[iG] = (int)(vGV * 255);
+        Y[iB] = (int)(vBY * 256); U[iB] = (int)(vBU * 255); V[iB] = (int)(vBV * 255);
     }
 
     for (int h = 0; h < halfHeight; ++h)
