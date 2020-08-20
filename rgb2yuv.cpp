@@ -8,6 +8,13 @@
 #   include <arm_neon.h>
 #elif defined(_M_IX86) || defined(_M_AMD64) || defined(__i386__) || defined(__amd64__)
 #   include <immintrin.h>
+#   if defined(_MSC_VER)
+#       define _mm_shuffle_ps(a, b, c)      (__m128i&)_mm_shuffle_ps((__m128&)a, (__m128&)b, c)
+#       define _mm256_shuffle_ps(a, b, c)   (__m256i&)_mm_shuffle_ps((__m256&)a, (__m256&)b, c)
+#       define _mm_movehl_ps(a, b)          (__m128i&)_mm_movehl_ps((__m128&)a, (__m128&)b)
+#       define _mm_storel_pi(a, b)          _mm_storel_pi(a, (__m128&)b)
+#       define _mm_storeh_pi(a, b)          _mm_storeh_pi(a, (__m128&)b)
+#   endif
 #endif
 #include "rgb2yuv.h"
 
@@ -331,10 +338,10 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
                                         U[0], U[1], U[2], 0);
             __m128i vv = _mm_setr_epi16(V[0], V[1], V[2], 0,
                                         V[0], V[1], V[2], 0);
-            __m128i uu00 = _mm_packs_epi32(_mm_madd_epi16(_mm_unpacklo_epi8(uv0, __m128()), uu), _mm_madd_epi16(_mm_unpackhi_epi8(uv0, __m128()), uu));
-            __m128i uu01 = _mm_packs_epi32(_mm_madd_epi16(_mm_unpacklo_epi8(uv1, __m128()), uu), _mm_madd_epi16(_mm_unpackhi_epi8(uv1, __m128()), uu));
-            __m128i vv00 = _mm_packs_epi32(_mm_madd_epi16(_mm_unpacklo_epi8(uv0, __m128()), vv), _mm_madd_epi16(_mm_unpackhi_epi8(uv0, __m128()), vv));
-            __m128i vv01 = _mm_packs_epi32(_mm_madd_epi16(_mm_unpacklo_epi8(uv1, __m128()), vv), _mm_madd_epi16(_mm_unpackhi_epi8(uv1, __m128()), vv));
+            __m128i uu00 = _mm_packs_epi32(_mm_madd_epi16(_mm_unpacklo_epi8(uv0, __m128i()), uu), _mm_madd_epi16(_mm_unpackhi_epi8(uv0, __m128i()), uu));
+            __m128i uu01 = _mm_packs_epi32(_mm_madd_epi16(_mm_unpacklo_epi8(uv1, __m128i()), uu), _mm_madd_epi16(_mm_unpackhi_epi8(uv1, __m128i()), uu));
+            __m128i vv00 = _mm_packs_epi32(_mm_madd_epi16(_mm_unpacklo_epi8(uv0, __m128i()), vv), _mm_madd_epi16(_mm_unpackhi_epi8(uv0, __m128i()), vv));
+            __m128i vv01 = _mm_packs_epi32(_mm_madd_epi16(_mm_unpacklo_epi8(uv1, __m128i()), vv), _mm_madd_epi16(_mm_unpackhi_epi8(uv1, __m128i()), vv));
             __m128i u00 = _mm_packs_epi32(_mm_madd_epi16(uu00, _mm_set1_epi16(1)), _mm_madd_epi16(uu01, _mm_set1_epi16(1)));
             __m128i v00 = _mm_packs_epi32(_mm_madd_epi16(vv00, _mm_set1_epi16(1)), _mm_madd_epi16(vv01, _mm_set1_epi16(1)));
 #endif
