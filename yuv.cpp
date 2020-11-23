@@ -291,7 +291,7 @@ void yuv(int width, int height, const void* y, const void* u, const void* v, int
     }
 }
 //------------------------------------------------------------------------------
-void yuv_yu12_to_vuya(int width, int height, const void* input, void* output, int strideOutput, int alignWidth, int alignHeight, int alignSize)
+void yuv_yu12_to_yuva(int width, int height, const void* input, void* output, bool yuvSwizzle, int strideOutput, int alignWidth, int alignHeight, int alignSize)
 {
     int strideY = align(width, alignWidth);
     int strideU = align(width, alignWidth) / 2;
@@ -301,10 +301,21 @@ void yuv_yu12_to_vuya(int width, int height, const void* input, void* output, in
     if (strideOutput == 0)
         strideOutput = 4 * width;
 
-    yuv<false, false, 2, 1, 0, 3>(width, height, input, (char*)input + sizeY, (char*)input + sizeY + sizeU, strideY, strideU, strideU, output, strideOutput);
+    auto converter = yuv<false, false, 0, 1, 2, 3>;
+
+    if (yuvSwizzle)
+    {
+        converter = yuv<false, false, 2, 1, 0, 3>;
+    }
+    else
+    {
+        converter = yuv<false, false, 0, 1, 2, 3>;
+    }
+    
+    converter(width, height, input, (char*)input + sizeY, (char*)input + sizeY + sizeU, strideY, strideU, strideU, output, strideOutput);
 }
 //------------------------------------------------------------------------------
-void yuv_yv12_to_vuya(int width, int height, const void* input, void* output, int strideOutput, int alignWidth, int alignHeight, int alignSize)
+void yuv_yv12_to_yuva(int width, int height, const void* input, void* output, bool yuvSwizzle, int strideOutput, int alignWidth, int alignHeight, int alignSize)
 {
     int strideY = align(width, alignWidth);
     int strideU = align(width, alignWidth) / 2;
@@ -314,10 +325,21 @@ void yuv_yv12_to_vuya(int width, int height, const void* input, void* output, in
     if (strideOutput == 0)
         strideOutput = 4 * width;
 
-    yuv<false, false, 2, 1, 0, 3>(width, height, input, (char*)input + sizeY + sizeU, (char*)input + sizeY, strideY, strideU, strideU, output, strideOutput);
+    auto converter = yuv<false, false, 0, 1, 2, 3>;
+
+    if (yuvSwizzle)
+    {
+        converter = yuv<false, false, 2, 1, 0, 3>;
+    }
+    else
+    {
+        converter = yuv<false, false, 0, 1, 2, 3>;
+    }
+
+    converter(width, height, input, (char*)input + sizeY + sizeU, (char*)input + sizeY, strideY, strideU, strideU, output, strideOutput);
 }
 //------------------------------------------------------------------------------
-void yuv_nv12_to_vuya(int width, int height, const void* input, void* output, int strideOutput, int alignWidth, int alignHeight, int alignSize)
+void yuv_nv12_to_yuva(int width, int height, const void* input, void* output, bool yuvSwizzle, int strideOutput, int alignWidth, int alignHeight, int alignSize)
 {
     int strideYUV = align(width, alignWidth);
     int sizeY = align(strideYUV * align(height, alignHeight), alignSize);
@@ -326,10 +348,21 @@ void yuv_nv12_to_vuya(int width, int height, const void* input, void* output, in
     if (strideOutput == 0)
         strideOutput = 4 * width;
 
-    yuv<true, true, 2, 1, 0, 3>(width, height, input, (char*)input + sizeY, (char*)input + sizeY + 1, strideYUV, strideYUV, strideYUV, output, strideOutput);
+    auto converter = yuv<true, true, 0, 1, 2, 3>;
+
+    if (yuvSwizzle)
+    {
+        converter = yuv<true, true, 2, 1, 0, 3>;
+    }
+    else
+    {
+        converter = yuv<true, true, 0, 1, 2, 3>;
+    }
+
+    converter(width, height, input, (char*)input + sizeY, (char*)input + sizeY + 1, strideYUV, strideYUV, strideYUV, output, strideOutput);
 }
 //------------------------------------------------------------------------------
-void yuv_nv21_to_vuya(int width, int height, const void* input, void* output, int strideOutput, int alignWidth, int alignHeight, int alignSize)
+void yuv_nv21_to_yuva(int width, int height, const void* input, void* output, bool yuvSwizzle, int strideOutput, int alignWidth, int alignHeight, int alignSize)
 {
     int strideYUV = align(width, alignWidth);
     int sizeY = align(strideYUV * align(height, alignHeight), alignSize);
@@ -338,6 +371,17 @@ void yuv_nv21_to_vuya(int width, int height, const void* input, void* output, in
     if (strideOutput == 0)
         strideOutput = 4 * width;
 
-    yuv<true, false, 2, 1, 0, 3>(width, height, input, (char*)input + sizeY + 1, (char*)input + sizeY, strideYUV, strideYUV, strideYUV, output, strideOutput);
+    auto converter = yuv<true, false, 0, 1, 2, 3>;
+
+    if (yuvSwizzle)
+    {
+        converter = yuv<true, false, 2, 1, 0, 3>;
+    }
+    else
+    {
+        converter = yuv<true, false, 0, 1, 2, 3>;
+    }
+
+    converter(width, height, input, (char*)input + sizeY + 1, (char*)input + sizeY, strideYUV, strideYUV, strideYUV, output, strideOutput);
 }
 //------------------------------------------------------------------------------
