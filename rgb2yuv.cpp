@@ -10,7 +10,7 @@
 #   include <arm_neon.h>
 #elif defined(_M_IX86) || defined(_M_AMD64) || defined(__i386__) || defined(__amd64__)
 #   include <immintrin.h>
-#   if defined(_MSC_VER)
+#   if defined(_MSC_VER) && !defined(__llvm__)
 #       define _mm_shuffle_ps(a, b, c)      (__m128i&)_mm_shuffle_ps((__m128&)a, (__m128&)b, c)
 #       define _mm256_shuffle_ps(a, b, c)   (__m256i&)_mm256_shuffle_ps((__m256&)a, (__m256&)b, c)
 #       define _mm_movehl_ps(a, b)          (__m128i&)_mm_movehl_ps((__m128&)a, (__m128&)b)
