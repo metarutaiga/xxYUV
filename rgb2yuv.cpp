@@ -4,9 +4,7 @@
 // Copyright (c) 2020 TAiGA
 // https://github.com/metarutaiga/xxYUV
 //==============================================================================
-#if defined(_M_ARM64) || defined(_M_HYBRID_X86_ARM64)
-#   include <arm64_neon.h>
-#elif defined(__ARM_NEON__) || defined(__ARM_NEON) || defined(_M_ARM) || defined(_M_ARM64)
+#if defined(__ARM_NEON__) || defined(__ARM_NEON) || defined(_M_ARM) || defined(_M_ARM64) || defined(_M_HYBRID_X86_ARM64)
 #   include <arm_neon.h>
 #elif defined(_M_IX86) || defined(_M_AMD64) || defined(__i386__) || defined(__amd64__)
 #   include <immintrin.h>
