@@ -70,7 +70,7 @@ void yuv(int width, int height, const void* y, const void* u, const void* v, int
         const unsigned char* v0 = (unsigned char*)v;        v = v0 + strideV;
         unsigned char* output0 = (unsigned char*)output;
         unsigned char* output1 = output0 + strideOutput;    output = output1 + strideOutput;
-#if defined(__ARM_NEON__) || defined(__ARM_NEON) || defined(_M_ARM) || defined(_M_ARM64)
+#if defined(__ARM_NEON__) || defined(__ARM_NEON) || defined(_M_ARM) || defined(_M_ARM64) || defined(_M_HYBRID_X86_ARM64)
         int halfWidth8 = halfWidth / 8;
         for (int w = 0; w < halfWidth8; ++w)
         {

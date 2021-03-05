@@ -93,7 +93,7 @@ void rgb2yuv(int width, int height, const void* rgb, int strideRGB, void* y, voi
         unsigned char* y1 = y0 + strideY;                   y = y1 + strideY;
         unsigned char* u0 = (unsigned char*)u;              u = u0 + strideU;
         unsigned char* v0 = (unsigned char*)v;              v = v0 + strideV;
-#if defined(__ARM_NEON__) || defined(__ARM_NEON) || defined(_M_ARM) || defined(_M_ARM64)
+#if defined(__ARM_NEON__) || defined(__ARM_NEON) || defined(_M_ARM) || defined(_M_ARM64) || defined(_M_HYBRID_X86_ARM64)
         int halfWidth8 = (rgbWidth == 4) ? halfWidth / 8 : 0;
         for (int w = 0; w < halfWidth8; ++w)
         {
