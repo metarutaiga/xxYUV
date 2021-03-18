@@ -280,7 +280,7 @@ void yuv2rgb_amx(int width, int height, const void* y, const void* u, const void
 #endif
 }
 //------------------------------------------------------------------------------
-void yyy2rgb_yu12_amx(int width, int height, const void* y, int strideY, void* rgb, int strideRGB)
+void yyy2rgb_amx(int width, int height, const void* y, int strideY, void* rgb, int strideRGB)
 {
 #if defined(__APPLE__) && defined(__aarch64__)
     int halfWidth = width >> 1;
