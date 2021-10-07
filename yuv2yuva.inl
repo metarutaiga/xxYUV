@@ -1,13 +1,15 @@
 //==============================================================================
-// xxYUV : yuv Source
+// xxYUV : yuv2yuva Inline
 //
-// Copyright (c) 2020 TAiGA
+// Copyright (c) 2020-2021 TAiGA
 // https://github.com/metarutaiga/xxYUV
 //==============================================================================
 #if defined(__ARM_NEON__) || defined(__ARM_NEON) || defined(_M_ARM) || defined(_M_ARM64) || defined(_M_HYBRID_X86_ARM64)
 #   include <arm_neon.h>
 #elif defined(_M_IX86) || defined(_M_AMD64) || defined(__i386__) || defined(__amd64__)
 #   include <immintrin.h>
+#   include <avxintrin.h>
+#   include <avx2intrin.h>
 #   define _MM_TRANSPOSE4_EPI8(R0, R1, R2, R3) {    \
         __m128i T0, T1, T2, T3;                     \
         T0 = _mm_unpacklo_epi8(R0, R1);             \
@@ -42,17 +44,10 @@
         R3 = T3;                                    \
     }
 #endif
-#include "yuv.h"
-
-#if defined(__llvm__)
-#   pragma clang diagnostic ignored "-Wunused-variable"
-#endif
-
-#define align(v, a) ((v) + ((a) - 1) & ~((a) - 1))
 
 //------------------------------------------------------------------------------
 template<bool interleaved, bool firstU, int iY, int iU, int iV, int iA>
-void yuv(int width, int height, const void* y, const void* u, const void* v, int strideY, int strideU, int strideV, void* output, int strideOutput)
+void yuv2yuva(int width, int height, const void* y, const void* u, const void* v, int strideY, int strideU, int strideV, void* output, int strideOutput)
 {
     if (strideOutput < 0)
     {
@@ -70,7 +65,7 @@ void yuv(int width, int height, const void* y, const void* u, const void* v, int
         const unsigned char* v0 = (unsigned char*)v;        v = v0 + strideV;
         unsigned char* output0 = (unsigned char*)output;
         unsigned char* output1 = output0 + strideOutput;    output = output1 + strideOutput;
-#if defined(__ARM_NEON__) || defined(__ARM_NEON) || defined(_M_ARM) || defined(_M_ARM64) || defined(_M_HYBRID_X86_ARM64)
+#if HAVE_NEON
         int halfWidth8 = halfWidth / 8;
         for (int w = 0; w < halfWidth8; ++w)
         {
@@ -124,7 +119,7 @@ void yuv(int width, int height, const void* y, const void* u, const void* v, int
             vst4q_u8(output1, b); output1 += 16 * 4;
         }
         continue;
-#elif defined(__AVX2__)
+#elif HAVE_AVX2
         int halfWidth16 = halfWidth / 16;
         for (int w = 0; w < halfWidth16; ++w)
         {
@@ -187,7 +182,7 @@ void yuv(int width, int height, const void* y, const void* u, const void* v, int
             _mm256_storeu_si256((__m256i*)output1 + 3, b[3]); output1 += 16 * 8;
         }
         continue;
-#elif defined(_M_IX86) || defined(_M_AMD64) || defined(__i386__) || defined(__amd64__)
+#elif HAVE_SSE2
         int halfWidth8 = halfWidth / 8;
         for (int w = 0; w < halfWidth8; ++w)
         {
@@ -289,97 +284,55 @@ void yuv(int width, int height, const void* y, const void* u, const void* v, int
     }
 }
 //------------------------------------------------------------------------------
-void yuv_yu12_to_yuva(int width, int height, const void* input, void* output, bool yuvSwizzle, int strideOutput, int alignWidth, int alignHeight, int alignSize)
-{
-    int strideY = align(width, alignWidth);
-    int strideU = align(width, alignWidth) / 2;
-    int sizeY = align(strideY * align(height, alignHeight), alignSize);
-    int sizeU = align(strideU * align(height, alignHeight) / 2, alignSize);
-
-    if (strideOutput == 0)
-        strideOutput = 4 * width;
-
-    auto converter = yuv<false, false, 0, 1, 2, 3>;
-
-    if (yuvSwizzle)
-    {
-        converter = yuv<false, false, 2, 1, 0, 3>;
-    }
-    else
-    {
-        converter = yuv<false, false, 0, 1, 2, 3>;
-    }
-    
-    converter(width, height, input, (char*)input + sizeY, (char*)input + sizeY + sizeU, strideY, strideU, strideU, output, strideOutput);
-}
+#ifndef yuv2yuva_select
+#define yuv2yuva_select(interleaved, firstU, iY, iU, iV, iA) \
+    yuv2yuva<interleaved, firstU, iY, iU, iV, iA>
+#endif
 //------------------------------------------------------------------------------
-void yuv_yv12_to_yuva(int width, int height, const void* input, void* output, bool yuvSwizzle, int strideOutput, int alignWidth, int alignHeight, int alignSize)
-{
-    int strideY = align(width, alignWidth);
-    int strideU = align(width, alignWidth) / 2;
-    int sizeY = align(strideY * align(height, alignHeight), alignSize);
-    int sizeU = align(strideU * align(height, alignHeight) / 2, alignSize);
-
-    if (strideOutput == 0)
-        strideOutput = 4 * width;
-
-    auto converter = yuv<false, false, 0, 1, 2, 3>;
-
-    if (yuvSwizzle)
-    {
-        converter = yuv<false, false, 2, 1, 0, 3>;
-    }
-    else
-    {
-        converter = yuv<false, false, 0, 1, 2, 3>;
-    }
-
-    converter(width, height, input, (char*)input + sizeY + sizeU, (char*)input + sizeY, strideY, strideU, strideU, output, strideOutput);
-}
+#ifndef yuv2yuva
 //------------------------------------------------------------------------------
-void yuv_nv12_to_yuva(int width, int height, const void* input, void* output, bool yuvSwizzle, int strideOutput, int alignWidth, int alignHeight, int alignSize)
-{
-    int strideYUV = align(width, alignWidth);
-    int sizeY = align(strideYUV * align(height, alignHeight), alignSize);
-    int sizeUV = align(strideYUV * align(height, alignHeight) / 2, alignSize);
-
-    if (strideOutput == 0)
-        strideOutput = 4 * width;
-
-    auto converter = yuv<true, true, 0, 1, 2, 3>;
-
-    if (yuvSwizzle)
-    {
-        converter = yuv<true, true, 2, 1, 0, 3>;
-    }
-    else
-    {
-        converter = yuv<true, true, 0, 1, 2, 3>;
-    }
-
-    converter(width, height, input, (char*)input + sizeY, (char*)input + sizeY + 1, strideYUV, strideYUV, strideYUV, output, strideOutput);
-}
+#if defined(__clang__)
+#define yuv2yuva_attribute(value) __attribute__((target(value)))
+#else
+#define yuv2yuva_attribute(value)
+#endif
 //------------------------------------------------------------------------------
-void yuv_nv21_to_yuva(int width, int height, const void* input, void* output, bool yuvSwizzle, int strideOutput, int alignWidth, int alignHeight, int alignSize)
-{
-    int strideYUV = align(width, alignWidth);
-    int sizeY = align(strideYUV * align(height, alignHeight), alignSize);
-    int sizeUV = align(strideYUV * align(height, alignHeight) / 2, alignSize);
-
-    if (strideOutput == 0)
-        strideOutput = 4 * width;
-
-    auto converter = yuv<true, false, 0, 1, 2, 3>;
-
-    if (yuvSwizzle)
-    {
-        converter = yuv<true, false, 2, 1, 0, 3>;
-    }
-    else
-    {
-        converter = yuv<true, false, 0, 1, 2, 3>;
-    }
-
-    converter(width, height, input, (char*)input + sizeY + 1, (char*)input + sizeY, strideYUV, strideYUV, strideYUV, output, strideOutput);
-}
+#if defined(__ARM_NEON__) || defined(__ARM_NEON) || defined(_M_ARM) || defined(_M_ARM64) || defined(_M_HYBRID_X86_ARM64)
+#define HAVE_NEON 1
+#define yuv2yuva yuv2yuva_attribute("neon") yuv2yuva_neon
+#include "yuv2yuva.inl"
+#undef yuv2yuva
+#undef HAVE_NEON
+#undef yuv2yuva_select
+#define yuv2yuva_select(interleaved, firstU, iY, iU, iV, iA) \
+    neon() ? yuv2yuva_neon<interleaved, firstU, iY, iU, iV, iA> : \
+    yuv2yuva<interleaved, firstU, iY, iU, iV, iA>
+#endif
+//------------------------------------------------------------------------------
+#if defined(_M_IX86) || defined(_M_AMD64) || defined(__i386__) || defined(__amd64__)
+#define HAVE_SSE2 1
+#define yuv2yuva yuv2yuva_attribute("sse2") yuv2yuva_sse2
+#include "yuv2yuva.inl"
+#undef yuv2yuva
+#undef HAVE_SSE2
+#undef yuv2yuva_select
+#define yuv2yuva_select(interleaved, firstU, iY, iU, iV, iA) \
+    sse2() ? yuv2yuva_sse2<interleaved, firstU, iY, iU, iV, iA> : \
+    yuv2yuva<interleaved, firstU, iY, iU, iV, iAe>
+#endif
+//------------------------------------------------------------------------------
+#if defined(_M_IX86) || defined(_M_AMD64) || defined(__i386__) || defined(__amd64__)
+#define HAVE_AVX2 1
+#define yuv2yuva yuv2yuva_attribute("avx2") yuv2yuva_avx2
+#include "yuv2yuva.inl"
+#undef yuv2yuva
+#undef HAVE_AVX2
+#undef yuv2yuva_select
+#define yuv2yuva_select(interleaved, firstU, iY, iU, iV, iA) \
+    avx2() ? yuv2yuva_avx2<interleaved, firstU, iY, iU, iV, iA> : \
+    sse2() ? yuv2yuva_sse2<interleaved, firstU, iY, iU, iV, iA> : \
+    yuv2yuva<interleaved, firstU, iY, iU, iV, iA>
+#endif
+//------------------------------------------------------------------------------
+#endif
 //------------------------------------------------------------------------------

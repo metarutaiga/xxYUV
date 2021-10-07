@@ -1,9 +1,10 @@
 //==============================================================================
 // xxYUV : yuv2rgb_amx Header
 //
-// Copyright (c) 2020 TAiGA
+// Copyright (c) 2021 TAiGA
 // https://github.com/metarutaiga/xxYUV
 //==============================================================================
+#pragma once
 
 #ifndef xxYUV_EXPORT
 #define xxYUV_EXPORT

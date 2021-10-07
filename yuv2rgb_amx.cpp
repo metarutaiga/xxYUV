@@ -1,7 +1,7 @@
 //==============================================================================
 // xxYUV : yuv2rgb_amx Source
 //
-// Copyright (c) 2020 TAiGA
+// Copyright (c) 2021 TAiGA
 // https://github.com/metarutaiga/xxYUV
 //==============================================================================
 #include "apple_amx.h"
