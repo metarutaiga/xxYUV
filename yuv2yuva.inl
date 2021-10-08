@@ -8,8 +8,10 @@
 #   include <arm_neon.h>
 #elif defined(_M_IX86) || defined(_M_AMD64) || defined(__i386__) || defined(__amd64__)
 #   include <immintrin.h>
-#   include <avxintrin.h>
-#   include <avx2intrin.h>
+#   if defined(__llvm__)
+#       include <avxintrin.h>
+#       include <avx2intrin.h>
+#   endif
 #   define _MM_TRANSPOSE4_EPI8(R0, R1, R2, R3) {    \
         __m128i T0, T1, T2, T3;                     \
         T0 = _mm_unpacklo_epi8(R0, R1);             \
@@ -291,7 +293,7 @@ void yuv2yuva(int width, int height, const void* y, const void* u, const void* v
 //------------------------------------------------------------------------------
 #ifndef yuv2yuva
 //------------------------------------------------------------------------------
-#if defined(__clang__)
+#if defined(__llvm__)
 #define yuv2yuva_attribute(value) __attribute__((target(value)))
 #else
 #define yuv2yuva_attribute(value)
