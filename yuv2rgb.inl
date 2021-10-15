@@ -396,8 +396,8 @@ void yuv2rgb(int width, int height, const void* y, const void* u, const void* v,
             _mm256_storeu_si256((__m256i*)rgb0 + 0, t[0]);
             _mm256_storeu_si256((__m256i*)rgb0 + 1, t[1]);
             _mm256_storeu_si256((__m256i*)rgb0 + 2, t[2]);
-            _mm256_storeu_si256((__m256i*)rgb0 + 3, t[3]);
-            _mm256_storeu_si256((__m256i*)rgb1 + 0, b[0]); rgb0 += 16 * 8;
+            _mm256_storeu_si256((__m256i*)rgb0 + 3, t[3]); rgb0 += 16 * 8;
+            _mm256_storeu_si256((__m256i*)rgb1 + 0, b[0]);
             _mm256_storeu_si256((__m256i*)rgb1 + 1, b[1]);
             _mm256_storeu_si256((__m256i*)rgb1 + 2, b[2]);
             _mm256_storeu_si256((__m256i*)rgb1 + 3, b[3]); rgb1 += 16 * 8;
