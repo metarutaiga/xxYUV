@@ -35,6 +35,10 @@ void yuv2yuva_yu12(const yuv2yuva_parameter* parameter)
     void* output = parameter->output;
     bool swizzleOutput = parameter->swizzleOutput;
     int strideOutput = parameter->strideOutput ? parameter->strideOutput : 4 * width;
+    if (strideOutput < 0)
+    {
+        output = (char*)output - (strideOutput * (height - 1));
+    }
 
     u = u ? u : (char*)y + sizeY;
     v = v ? v : (char*)y + sizeY + sizeU;
@@ -75,6 +79,10 @@ void yuv2yuva_yv12(const yuv2yuva_parameter* parameter)
     void* output = parameter->output;
     bool swizzleOutput = parameter->swizzleOutput;
     int strideOutput = parameter->strideOutput ? parameter->strideOutput : 4 * width;
+    if (strideOutput < 0)
+    {
+        output = (char*)output - (strideOutput * (height - 1));
+    }
 
     u = u ? u : (char*)y + sizeY + sizeU;
     v = v ? v : (char*)y + sizeY;
@@ -113,6 +121,10 @@ void yuv2yuva_nv12(const yuv2yuva_parameter* parameter)
     void* output = parameter->output;
     bool swizzleOutput = parameter->swizzleOutput;
     int strideOutput = parameter->strideOutput ? parameter->strideOutput : 4 * width;
+    if (strideOutput < 0)
+    {
+        output = (char*)output - (strideOutput * (height - 1));
+    }
 
     u = u ? u : (char*)y + sizeY;
     v = v ? v : (char*)y + sizeY + 1;
@@ -151,6 +163,10 @@ void yuv2yuva_nv21(const yuv2yuva_parameter* parameter)
     void* output = parameter->output;
     bool swizzleOutput = parameter->swizzleOutput;
     int strideOutput = parameter->strideOutput ? parameter->strideOutput : 4 * width;
+    if (strideOutput < 0)
+    {
+        output = (char*)output - (strideOutput * (height - 1));
+    }
 
     u = u ? u : (char*)y + sizeY + 1;
     v = v ? v : (char*)y + sizeY;

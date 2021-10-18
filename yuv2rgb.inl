@@ -96,11 +96,6 @@
 template<int componentRGB, bool swizzleRGB, bool interleaved, bool firstU, bool videoRange>
 void yuv2rgb(int width, int height, const void* y, const void* u, const void* v, int strideY, int strideU, int strideV, void* rgb, int strideRGB)
 {
-    if (strideRGB < 0)
-    {
-        rgb = (char*)rgb - (strideRGB * (height - 1));
-    }
-
     int halfWidth = width >> 1;
     int halfHeight = height >> 1;
 

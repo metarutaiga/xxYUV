@@ -37,6 +37,10 @@ void yuv2rgb_yu12(const yuv2rgb_parameter* parameter)
     int componentRGB = parameter->componentRGB;
     int strideRGB = parameter->strideRGB ? parameter->strideRGB : componentRGB * width;
     bool swizzleRGB = parameter->swizzleRGB;
+    if (strideRGB < 0)
+    {
+        rgb = (char*)rgb - (strideRGB * (height - 1));
+    }
 
     u = u ? u : (char*)y + sizeY;
     v = v ? v : (char*)y + sizeY + sizeU;
@@ -131,6 +135,10 @@ void yuv2rgb_yv12(const yuv2rgb_parameter* parameter)
     int componentRGB = parameter->componentRGB;
     int strideRGB = parameter->strideRGB ? parameter->strideRGB : componentRGB * width;
     bool swizzleRGB = parameter->swizzleRGB;
+    if (strideRGB < 0)
+    {
+        rgb = (char*)rgb - (strideRGB * (height - 1));
+    }
 
     u = u ? u : (char*)y + sizeY + sizeU;
     v = v ? v : (char*)y + sizeY;
@@ -223,6 +231,10 @@ void yuv2rgb_nv12(const yuv2rgb_parameter* parameter)
     int componentRGB = parameter->componentRGB;
     int strideRGB = parameter->strideRGB ? parameter->strideRGB : componentRGB * width;
     bool swizzleRGB = parameter->swizzleRGB;
+    if (strideRGB < 0)
+    {
+        rgb = (char*)rgb - (strideRGB * (height - 1));
+    }
 
     u = u ? u : (char*)y + sizeY;
     v = v ? v : (char*)y + sizeY + 1;
@@ -315,6 +327,10 @@ void yuv2rgb_nv21(const yuv2rgb_parameter* parameter)
     int componentRGB = parameter->componentRGB;
     int strideRGB = parameter->strideRGB ? parameter->strideRGB : componentRGB * width;
     bool swizzleRGB = parameter->swizzleRGB;
+    if (strideRGB < 0)
+    {
+        rgb = (char*)rgb - (strideRGB * (height - 1));
+    }
 
     u = u ? u : (char*)y + sizeY + 1;
     v = v ? v : (char*)y + sizeY;

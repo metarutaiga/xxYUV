@@ -51,11 +51,6 @@
 template<bool interleaved, bool firstU, int iY, int iU, int iV, int iA>
 void yuv2yuva(int width, int height, const void* y, const void* u, const void* v, int strideY, int strideU, int strideV, void* output, int strideOutput)
 {
-    if (strideOutput < 0)
-    {
-        output = (char*)output - (strideOutput * (height - 1));
-    }
-
     int halfWidth = width >> 1;
     int halfHeight = height >> 1;
 
