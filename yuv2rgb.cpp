@@ -4,13 +4,12 @@
 // Copyright (c) 2020-2021 TAiGA
 // https://github.com/metarutaiga/xxYUV
 //==============================================================================
-#include "cpu.h"
-#include "yuv2rgb.inl"
-#include "yuv2rgb.h"
-
 #if defined(__llvm__)
 #   pragma clang diagnostic ignored "-Wunused-variable"
 #endif
+#include "cpu.h"
+#include "yuv2rgb.inl"
+#include "yuv2rgb.h"
 
 #define align(v, a) ((v) + ((a) - 1) & ~((a) - 1))
 
